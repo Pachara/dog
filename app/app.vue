@@ -1,45 +1,14 @@
 <template>
-  <div class="app">
-    <header class="header">
-      <div class="header-top">
-        <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
-          {{ isDark ? '&#9788;' : '&#9790;' }}
-        </button>
-        <DesignSwitcher />
-      </div>
-      <h1>DOG</h1>
-      <p class="subtitle">URL uptime monitor</p>
-    </header>
-    <main class="main">
-      <component :is="currentComponents.AddUrlForm" />
-      <div class="toolbar">
-        <span class="count">{{ entries.length }} URL{{ entries.length !== 1 ? 's' : '' }} monitored</span>
-        <button class="btn btn-secondary" :disabled="isChecking || entries.length === 0" @click="checkAll">
-          {{ isChecking ? 'Checking...' : 'Check All Now' }}
-        </button>
-      </div>
-      <component :is="currentComponents.MonitorList" />
-    </main>
-  </div>
+  <NuxtPage />
 </template>
 
 <script setup lang="ts">
-const { entries, isChecking, loadFromStorage, checkAll, startPolling, stopPolling } = useMonitor()
-const { isDark, loadTheme, toggleTheme } = useTheme()
-const { currentComponents, loadDesign } = useDesign()
+const { loadTheme } = useTheme()
+const { loadDesign } = useDesign()
 
 onMounted(() => {
   loadTheme()
   loadDesign()
-  loadFromStorage()
-  if (entries.value.length > 0) {
-    checkAll()
-  }
-  startPolling()
-})
-
-onUnmounted(() => {
-  stopPolling()
 })
 </script>
 
@@ -84,68 +53,6 @@ body {
   color: var(--text-primary);
   line-height: 1.5;
   transition: background 0.3s, color 0.3s;
-}
-
-.app {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 2rem;
-  position: relative;
-}
-
-.header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.header h1 {
-  font-size: 2rem;
-  margin: 0;
-  letter-spacing: 0.1em;
-}
-
-.subtitle {
-  color: var(--text-secondary);
-  margin: 0.25rem 0 0;
-  font-size: 0.9rem;
-}
-
-.theme-toggle {
-  background: var(--bg-btn-secondary);
-  border: none;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  font-size: 1.1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
-  color: var(--text-primary);
-}
-
-.theme-toggle:hover {
-  background: var(--bg-btn-secondary-hover);
-}
-
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 1.5rem 0 1rem;
-}
-
-.count {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
 }
 
 .btn {
