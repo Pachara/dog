@@ -1,21 +1,24 @@
 <template>
   <div class="app">
     <header class="header">
+      <div class="header-top">
+        <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
+          {{ isDark ? '&#9788;' : '&#9790;' }}
+        </button>
+        <DesignSwitcher />
+      </div>
       <h1>DOG</h1>
       <p class="subtitle">URL uptime monitor</p>
-      <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
-        {{ isDark ? '&#9788;' : '&#9790;' }}
-      </button>
     </header>
     <main class="main">
-      <AddUrlForm />
+      <component :is="currentComponents.AddUrlForm" />
       <div class="toolbar">
         <span class="count">{{ entries.length }} URL{{ entries.length !== 1 ? 's' : '' }} monitored</span>
         <button class="btn btn-secondary" :disabled="isChecking || entries.length === 0" @click="checkAll">
           {{ isChecking ? 'Checking...' : 'Check All Now' }}
         </button>
       </div>
-      <MonitorList />
+      <component :is="currentComponents.MonitorList" />
     </main>
   </div>
 </template>
@@ -23,9 +26,11 @@
 <script setup lang="ts">
 const { entries, isChecking, loadFromStorage, checkAll, startPolling, stopPolling } = useMonitor()
 const { isDark, loadTheme, toggleTheme } = useTheme()
+const { currentComponents, loadDesign } = useDesign()
 
 onMounted(() => {
   loadTheme()
+  loadDesign()
   loadFromStorage()
   if (entries.value.length > 0) {
     checkAll()
@@ -93,6 +98,13 @@ body {
   position: relative;
 }
 
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
 .header h1 {
   font-size: 2rem;
   margin: 0;
@@ -106,9 +118,6 @@ body {
 }
 
 .theme-toggle {
-  position: absolute;
-  top: 0;
-  right: 0;
   background: var(--bg-btn-secondary);
   border: none;
   border-radius: 50%;

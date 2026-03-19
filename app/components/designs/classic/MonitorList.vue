@@ -1,7 +1,7 @@
 <template>
   <div class="monitor-list">
     <TransitionGroup name="list">
-      <MonitorCard v-for="entry in entries" :key="entry.id" :entry="entry" />
+      <DesignsClassicMonitorCard v-for="entry in entries" :key="entry.id" :entry="entry" />
     </TransitionGroup>
     <div v-if="entries.length === 0" class="empty-state">
       <p>No URLs being monitored yet.</p>

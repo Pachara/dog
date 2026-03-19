@@ -1,7 +1,7 @@
 <template>
   <div class="card" :class="'card--' + entry.status">
     <div class="card-left">
-      <StatusBadge :status="entry.status" />
+      <DesignsClassicStatusBadge :status="entry.status" />
       <div class="card-info">
         <span class="card-url">{{ displayUrl }}</span>
         <span class="card-meta">
