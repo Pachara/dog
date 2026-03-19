@@ -11,6 +11,8 @@ import ClassicAddUrlForm from './classic/AddUrlForm.vue'
 import ClassicMonitorList from './classic/MonitorList.vue'
 import ModernAddUrlForm from './modern/AddUrlForm.vue'
 import ModernMonitorList from './modern/MonitorList.vue'
+import Retro90AddUrlForm from './retro90/AddUrlForm.vue'
+import Retro90MonitorList from './retro90/MonitorList.vue'
 
 export interface DesignComponents {
   AddUrlForm: Component
@@ -25,5 +27,9 @@ export const designRegistry: Record<string, DesignComponents> = {
   modern: {
     AddUrlForm: ModernAddUrlForm,
     MonitorList: ModernMonitorList,
+  },
+  retro90: {
+    AddUrlForm: Retro90AddUrlForm,
+    MonitorList: Retro90MonitorList,
   },
 }
