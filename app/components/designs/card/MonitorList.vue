@@ -3,7 +3,7 @@
     <TransitionGroup name="cd">
       <DesignsCardMonitorCard v-for="entry in entries" :key="entry.id" :entry="entry" />
     </TransitionGroup>
-    <div v-if="entries.length === 0" class="cd-empty">
+    <div v-if="entries.length === 0" class="cd-empty" style="grid-column: 1 / -1">
       <div class="cd-empty-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
@@ -23,9 +23,15 @@ const { entries } = useMonitor()
 
 <style scoped>
 .cd-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
+}
+
+@media (max-width: 680px) {
+  .cd-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .cd-empty {
