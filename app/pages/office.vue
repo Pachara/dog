@@ -32,16 +32,16 @@
         v-for="oracle in oracles"
         :key="oracle.id"
         class="oracle-card"
-        :class="{ 'oracle-card--online': oracle.online }"
+        :class="{ 'oracle-card--online': oracle.status === 'online' }"
       >
         <div class="card-header">
-          <OracleAvatar :oracle-id="oracle.id" :online="oracle.online" />
+          <OracleAvatar :oracle-id="oracle.id" :status="oracle.status" />
           <div class="card-header-info">
             <div class="card-identity">
               <h2 class="card-name">{{ oracle.name }}</h2>
-              <span class="status-badge" :class="oracle.online ? 'status-badge--on' : 'status-badge--off'">
+              <span class="status-badge" :class="'status-badge--' + oracle.status">
                 <span class="status-dot" />
-                {{ oracle.online ? 'Online' : 'Offline' }}
+                {{ statusLabel(oracle.status) }}
               </span>
             </div>
             <p v-if="oracle.role" class="card-role">{{ oracle.role }}</p>
@@ -77,7 +77,16 @@
 const { isDark, toggleTheme } = useTheme()
 const { oracles, loading, fetchOracles, startPolling, stopPolling } = useOracle()
 
-const onlineCount = computed(() => oracles.value.filter(o => o.online).length)
+const onlineCount = computed(() => oracles.value.filter(o => o.status === 'online').length)
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'online': return 'Working'
+    case 'idle': return 'Idle'
+    case 'offline': return 'Offline'
+    default: return status
+  }
+}
 
 function timeAgo(isoString: string | null): string {
   if (!isoString) return ''
@@ -311,31 +320,46 @@ onUnmounted(() => {
   transition: all 0.3s ease;
 }
 
-.status-badge--on {
+.status-badge--online {
   background: rgba(34, 197, 94, 0.1);
   color: #16a34a;
 }
 
-.status-badge--on .status-dot {
+.status-badge--online .status-dot {
   background: #22c55e;
   box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
 }
 
-.status-badge--off {
+.status-badge--idle {
+  background: rgba(234, 179, 8, 0.1);
+  color: #a16207;
+}
+
+.status-badge--idle .status-dot {
+  background: #eab308;
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.3);
+}
+
+.status-badge--offline {
   background: rgba(107, 114, 128, 0.1);
   color: #6b7280;
 }
 
-.status-badge--off .status-dot {
+.status-badge--offline .status-dot {
   background: #9ca3af;
 }
 
-[data-theme="dark"] .status-badge--on {
+[data-theme="dark"] .status-badge--online {
   background: rgba(34, 197, 94, 0.12);
   color: #4ade80;
 }
 
-[data-theme="dark"] .status-badge--off {
+[data-theme="dark"] .status-badge--idle {
+  background: rgba(234, 179, 8, 0.12);
+  color: #facc15;
+}
+
+[data-theme="dark"] .status-badge--offline {
   background: rgba(107, 114, 128, 0.12);
   color: #9ca3af;
 }

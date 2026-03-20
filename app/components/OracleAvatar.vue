@@ -1,5 +1,5 @@
 <template>
-  <div class="avatar-scene" :class="{ 'avatar-scene--offline': !online }">
+  <div class="avatar-scene" :class="{ 'avatar-scene--offline': !isWorking }">
     <!-- Peter: Manager with glasses and clipboard -->
     <svg v-if="character === 'peter'" class="avatar-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
       <!-- Body -->
@@ -16,8 +16,8 @@
       <rect class="av-glasses" x="29" y="24" width="9" height="7" rx="2" fill="none" stroke="#1e293b" stroke-width="1.5" />
       <rect class="av-glasses" x="42" y="24" width="9" height="7" rx="2" fill="none" stroke="#1e293b" stroke-width="1.5" />
       <line x1="38" y1="27" x2="42" y2="27" stroke="#1e293b" stroke-width="1.5" />
-      <!-- Eyes (online: open, offline: closed) -->
-      <g v-if="online">
+      <!-- Eyes (working: open, sleeping: closed) -->
+      <g v-if="isWorking">
         <circle class="av-eye av-eye--blink" cx="33.5" cy="27.5" r="1.8" fill="#1e293b" />
         <circle class="av-eye av-eye--blink" cx="46.5" cy="27.5" r="1.8" fill="#1e293b" />
       </g>
@@ -26,9 +26,9 @@
         <line x1="44" y1="28" x2="49" y2="28" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" />
       </g>
       <!-- Mouth -->
-      <path v-if="online" d="M37,33 Q40,36 43,33" fill="none" stroke="#92400e" stroke-width="1" stroke-linecap="round" />
+      <path v-if="isWorking" d="M37,33 Q40,36 43,33" fill="none" stroke="#92400e" stroke-width="1" stroke-linecap="round" />
       <line v-else x1="37" y1="34" x2="43" y2="34" stroke="#92400e" stroke-width="1" stroke-linecap="round" />
-      <!-- Clipboard (online: typing motion) -->
+      <!-- Clipboard (working: typing motion) -->
       <g class="av-clipboard">
         <rect x="54" y="44" width="12" height="16" rx="1.5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1" />
         <rect x="56" y="42" width="8" height="3" rx="1" fill="#94a3b8" />
@@ -51,8 +51,8 @@
       <!-- Wavy hair -->
       <path d="M26,24 Q28,12 36,14 Q40,8 44,14 Q52,12 54,24" fill="#1e293b" />
       <path d="M26,22 Q30,18 34,22" fill="#1e293b" />
-      <!-- Sunglasses: on eyes when online, pushed up to forehead when offline -->
-      <g v-if="online">
+      <!-- Sunglasses: on eyes when working, pushed up to forehead when sleeping -->
+      <g v-if="isWorking">
         <path class="av-shades" d="M29,25 L29,29 Q29,31 31,31 L37,31 Q39,31 39,29 L39,25 Z" fill="#334155" />
         <path class="av-shades" d="M41,25 L41,29 Q41,31 43,31 L49,31 Q51,31 51,29 L51,25 Z" fill="#334155" />
         <line x1="39" y1="27" x2="41" y2="27" stroke="#334155" stroke-width="1.5" />
@@ -75,15 +75,15 @@
         <line x1="49" y1="27" x2="50" y2="25.5" stroke="#1e293b" stroke-width="0.8" stroke-linecap="round" />
       </g>
       <!-- Mouth -->
-      <path v-if="online" d="M35,34 Q40,38 45,34" fill="none" stroke="#92400e" stroke-width="1.2" stroke-linecap="round" />
+      <path v-if="isWorking" d="M35,34 Q40,38 45,34" fill="none" stroke="#92400e" stroke-width="1.2" stroke-linecap="round" />
       <line v-else x1="36" y1="35" x2="44" y2="35" stroke="#92400e" stroke-width="1" stroke-linecap="round" />
       <!-- Surfboard -->
       <g class="av-surfboard">
         <ellipse cx="16" cy="52" rx="4" ry="18" fill="#f97316" transform="rotate(-15, 16, 52)" />
         <line x1="16" y1="36" x2="16" y2="68" stroke="#fb923c" stroke-width="1" transform="rotate(-15, 16, 52)" />
       </g>
-      <!-- Wave under (online only) -->
-      <path v-if="online" class="av-wave" d="M4,72 Q12,66 20,72 Q28,78 36,72 Q44,66 52,72 Q60,78 68,72 Q76,66 84,72" fill="none" stroke="#22d3ee" stroke-width="2" opacity="0.4" />
+      <!-- Wave under (working only) -->
+      <path v-if="isWorking" class="av-wave" d="M4,72 Q12,66 20,72 Q28,78 36,72 Q44,66 52,72 Q60,78 68,72 Q76,66 84,72" fill="none" stroke="#22d3ee" stroke-width="2" opacity="0.4" />
     </svg>
 
     <!-- Fallback: generic Oracle -->
@@ -92,7 +92,7 @@
       <rect x="36" y="38" width="8" height="6" rx="2" fill="#fbbf24" />
       <circle class="av-head" cx="40" cy="28" r="14" fill="#fcd34d" />
       <path d="M26,24 Q28,14 40,14 Q52,14 54,24" fill="#6b7280" />
-      <g v-if="online">
+      <g v-if="isWorking">
         <circle class="av-eye av-eye--blink" cx="34" cy="27" r="1.8" fill="#1e293b" />
         <circle class="av-eye av-eye--blink" cx="46" cy="27" r="1.8" fill="#1e293b" />
       </g>
@@ -100,12 +100,12 @@
         <line x1="31.5" y1="28" x2="36.5" y2="28" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" />
         <line x1="43.5" y1="28" x2="48.5" y2="28" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" />
       </g>
-      <path v-if="online" d="M37,33 Q40,36 43,33" fill="none" stroke="#92400e" stroke-width="1" stroke-linecap="round" />
+      <path v-if="isWorking" d="M37,33 Q40,36 43,33" fill="none" stroke="#92400e" stroke-width="1" stroke-linecap="round" />
       <line v-else x1="37" y1="34" x2="43" y2="34" stroke="#92400e" stroke-width="1" stroke-linecap="round" />
     </svg>
 
     <!-- Zzz overlay for offline -->
-    <div v-if="!online" class="zzz-container">
+    <div v-if="!isWorking" class="zzz-container">
       <span class="zzz zzz-1">z</span>
       <span class="zzz zzz-2">z</span>
       <span class="zzz zzz-3">Z</span>
@@ -116,8 +116,10 @@
 <script setup lang="ts">
 const props = defineProps<{
   oracleId: string
-  online: boolean
+  status: 'online' | 'idle' | 'offline'
 }>()
+
+const isWorking = computed(() => props.status === 'online')
 
 const characterMap: Record<string, string> = {
   'my-oracle': 'peter',

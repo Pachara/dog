@@ -2,18 +2,80 @@ import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 
+type OracleActivity = 'online' | 'idle' | 'offline'
+
 interface OracleStatus {
   id: string
   name: string
   role: string
   path: string
-  online: boolean
+  status: OracleActivity
   inboxCount: number
   lastCommitMessage: string | null
   lastCommitTime: string | null
 }
 
 const PROJECTS_DIR = '/Users/pachara/Projects'
+
+// Patterns that indicate Claude is actively working
+const ACTIVE_PATTERNS = [
+  /Churned/i,
+  /Baked/i,
+  /Brewed/i,
+  /Cooked/i,
+  /Worked/i,
+  /Crunched/i,
+  /Proofing/i,
+  /Drafting/i,
+  /Composing/i,
+  /Thinking/i,
+  /Running/i,
+  /Streaming/i,
+  /⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏/,    // spinner characters
+  /●|◐|◓|◑|◒/,                       // dot spinners
+  /\.\.\./,                            // ellipsis progress
+  /█|▓|░/,                            // progress bar characters
+]
+
+// Patterns that indicate an idle prompt
+const IDLE_PATTERNS = [
+  /^❯\s*$/m,                          // empty prompt
+  /^\$\s*$/m,                          // bash empty prompt
+  /^>\s*$/m,                           // generic empty prompt
+  /waiting for input/i,
+  /^claude\s*$/m,                      // just "claude" with no activity
+]
+
+function detectActivity(sessionName: string): OracleActivity {
+  try {
+    const output = execSync(
+      `tmux capture-pane -t "${sessionName}" -p 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] },
+    )
+
+    // Get last 15 non-empty lines for analysis
+    const lines = output.split('\n').filter(l => l.trim()).slice(-15)
+    const recentText = lines.join('\n')
+
+    if (!recentText.trim()) return 'idle'
+
+    // Check for active work patterns first
+    for (const pattern of ACTIVE_PATTERNS) {
+      if (pattern.test(recentText)) return 'online'
+    }
+
+    // Check if the last few lines are just an idle prompt
+    const lastLines = lines.slice(-3).join('\n')
+    for (const pattern of IDLE_PATTERNS) {
+      if (pattern.test(lastLines)) return 'idle'
+    }
+
+    // If there's recent text but no clear signal, lean toward idle
+    return 'idle'
+  } catch {
+    return 'offline'
+  }
+}
 
 export default defineEventHandler(async (): Promise<OracleStatus[]> => {
   const oracles: OracleStatus[] = []
@@ -27,7 +89,7 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
 
   const oracleDirs = dirs.filter(d => d.endsWith('-oracle'))
 
-  // Get tmux sessions once — try multiple approaches for robustness
+  // Get tmux sessions once
   let tmuxSessions: string[] = []
   try {
     const output = execSync('tmux list-sessions -F "#{session_name}" 2>/dev/null', {
@@ -37,7 +99,6 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
     })
     tmuxSessions = output.trim().split('\n').map(s => s.trim()).filter(Boolean)
   } catch {
-    // Fallback: try parsing default tmux output format "name: N windows ..."
     try {
       const output = execSync('tmux list-sessions 2>/dev/null', {
         encoding: 'utf-8',
@@ -48,14 +109,13 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
         .map(line => line.split(':')[0]?.trim())
         .filter(Boolean)
     } catch {
-      // tmux not running or no sessions
+      // tmux not running
     }
   }
 
   for (const dir of oracleDirs) {
     const fullPath = join(PROJECTS_DIR, dir)
 
-    // Check it's a directory
     try {
       const s = await stat(fullPath)
       if (!s.isDirectory()) continue
@@ -68,7 +128,6 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
     let role = ''
     try {
       const claude = await readFile(join(fullPath, 'CLAUDE.md'), 'utf-8')
-      // Try multiple name patterns: "**I am**: Name", "I am: **Name**", or "# Name"
       const nameMatch = claude.match(/\*?\*?I am\*?\*?:?\s*(.+?)(?:\n|$)/)
         || claude.match(/^#\s+(.+?)(?:\n|$)/m)
       if (nameMatch) {
@@ -79,7 +138,7 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
         role = purposeMatch[1].replace(/\*\*/g, '').trim()
       }
     } catch {
-      // No CLAUDE.md or parse error
+      // No CLAUDE.md
     }
 
     // Count inbox messages
@@ -88,9 +147,7 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
       const inboxPath = join(fullPath, 'ψ', 'inbox')
       const inboxFiles = await readdir(inboxPath)
       inboxCount = inboxFiles.filter(f => f.endsWith('.md')).length
-    } catch {
-      // No inbox
-    }
+    } catch {}
 
     // Last git commit
     let lastCommitMessage: string | null = null
@@ -105,19 +162,20 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
         lastCommitMessage = msg || null
         lastCommitTime = time || null
       }
-    } catch {
-      // Not a git repo
-    }
+    } catch {}
 
-    // Check tmux session
-    const online = tmuxSessions.includes(dir)
+    // Detect activity status
+    let status: OracleActivity = 'offline'
+    if (tmuxSessions.includes(dir)) {
+      status = detectActivity(dir)
+    }
 
     oracles.push({
       id: dir,
       name,
       role,
       path: fullPath,
-      online,
+      status,
       inboxCount,
       lastCommitMessage,
       lastCommitTime,

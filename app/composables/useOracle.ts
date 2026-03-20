@@ -1,9 +1,11 @@
+export type OracleActivity = 'online' | 'idle' | 'offline'
+
 export interface OracleStatus {
   id: string
   name: string
   role: string
   path: string
-  online: boolean
+  status: OracleActivity
   inboxCount: number
   lastCommitMessage: string | null
   lastCommitTime: string | null
