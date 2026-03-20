@@ -11,10 +11,7 @@ export interface OracleStatus {
   lastCommitTime: string | null
 }
 
-const POLL_INTERVAL = 30_000
-
 // --- Web Audio API sound effects ---
-// Each Oracle gets a unique tone. No audio files needed.
 
 function getAudioContext(): AudioContext | null {
   if (import.meta.server) return null
@@ -25,37 +22,30 @@ function getAudioContext(): AudioContext | null {
   }
 }
 
-// Peter: crisp bell ding — high frequency with fast decay
 function playBellDing() {
   const ctx = getAudioContext()
   if (!ctx) return
   const t = ctx.currentTime
 
-  // Main bell tone
   const osc = ctx.createOscillator()
   osc.type = 'sine'
   osc.frequency.setValueAtTime(1200, t)
   osc.frequency.exponentialRampToValueAtTime(800, t + 0.15)
-
   const gain = ctx.createGain()
   gain.gain.setValueAtTime(0.3, t)
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5)
-
   osc.connect(gain)
   gain.connect(ctx.destination)
   osc.start(t)
   osc.stop(t + 0.5)
 
-  // Harmonic overtone for bell character
   const osc2 = ctx.createOscillator()
   osc2.type = 'sine'
   osc2.frequency.setValueAtTime(2400, t)
   osc2.frequency.exponentialRampToValueAtTime(1600, t + 0.1)
-
   const gain2 = ctx.createGain()
   gain2.gain.setValueAtTime(0.12, t)
   gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.3)
-
   osc2.connect(gain2)
   gain2.connect(ctx.destination)
   osc2.start(t)
@@ -64,49 +54,39 @@ function playBellDing() {
   setTimeout(() => ctx.close(), 600)
 }
 
-// Tony: wave/water splash — filtered noise burst with pitch sweep
 function playWaveSplash() {
   const ctx = getAudioContext()
   if (!ctx) return
   const t = ctx.currentTime
 
-  // White noise burst for splash texture
   const bufferSize = ctx.sampleRate * 0.4
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
   const data = buffer.getChannelData(0)
   for (let i = 0; i < bufferSize; i++) {
     data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2)
   }
-
   const noise = ctx.createBufferSource()
   noise.buffer = buffer
-
-  // Bandpass filter sweeps down for wave character
   const filter = ctx.createBiquadFilter()
   filter.type = 'bandpass'
   filter.frequency.setValueAtTime(2000, t)
   filter.frequency.exponentialRampToValueAtTime(400, t + 0.35)
   filter.Q.setValueAtTime(2, t)
-
   const gain = ctx.createGain()
   gain.gain.setValueAtTime(0.25, t)
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4)
-
   noise.connect(filter)
   filter.connect(gain)
   gain.connect(ctx.destination)
   noise.start(t)
 
-  // Sine undertone for warmth
   const osc = ctx.createOscillator()
   osc.type = 'sine'
   osc.frequency.setValueAtTime(500, t)
   osc.frequency.exponentialRampToValueAtTime(250, t + 0.3)
-
   const oscGain = ctx.createGain()
   oscGain.gain.setValueAtTime(0.15, t)
   oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35)
-
   osc.connect(oscGain)
   oscGain.connect(ctx.destination)
   osc.start(t)
@@ -115,26 +95,21 @@ function playWaveSplash() {
   setTimeout(() => ctx.close(), 500)
 }
 
-// Generic: simple two-tone chime
 function playChime() {
   const ctx = getAudioContext()
   if (!ctx) return
   const t = ctx.currentTime
-
   const osc = ctx.createOscillator()
   osc.type = 'sine'
   osc.frequency.setValueAtTime(660, t)
   osc.frequency.setValueAtTime(880, t + 0.12)
-
   const gain = ctx.createGain()
   gain.gain.setValueAtTime(0.2, t)
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4)
-
   osc.connect(gain)
   gain.connect(ctx.destination)
   osc.start(t)
   osc.stop(t + 0.4)
-
   setTimeout(() => ctx.close(), 500)
 }
 
@@ -153,14 +128,15 @@ function playSoundForOracle(id: string) {
 export function useOracle() {
   const oracles = useState<OracleStatus[]>('oracle-status', () => [])
   const loading = ref(false)
-  const pollId = ref<ReturnType<typeof setInterval> | null>(null)
+  const connected = ref(false)
   const previousStatuses = ref<Record<string, OracleActivity>>({})
+  let eventSource: EventSource | null = null
+  let fallbackPollId: ReturnType<typeof setInterval> | null = null
 
   function checkTransitions(newOracles: OracleStatus[]) {
     if (import.meta.server) return
     for (const oracle of newOracles) {
       const prev = previousStatuses.value[oracle.id]
-      // Only play on transition from non-online → online
       if (oracle.status === 'online' && prev && prev !== 'online') {
         playSoundForOracle(oracle.id)
       }
@@ -168,35 +144,81 @@ export function useOracle() {
     }
   }
 
+  function handleData(data: OracleStatus[]) {
+    checkTransitions(data)
+    oracles.value = data
+    loading.value = false
+  }
+
+  // SSE connection
+  function connect() {
+    if (import.meta.server) return
+    disconnect()
+    loading.value = true
+
+    eventSource = new EventSource('/api/oracle/stream')
+
+    eventSource.onmessage = (event) => {
+      connected.value = true
+      try {
+        const data = JSON.parse(event.data) as OracleStatus[]
+        handleData(data)
+      } catch {
+        // malformed data, ignore
+      }
+    }
+
+    eventSource.onerror = () => {
+      connected.value = false
+      // EventSource auto-reconnects, but start fallback polling
+      // in case SSE is completely broken
+      if (!fallbackPollId) {
+        fallbackPollId = setInterval(async () => {
+          if (connected.value) {
+            // SSE reconnected, stop fallback
+            if (fallbackPollId) {
+              clearInterval(fallbackPollId)
+              fallbackPollId = null
+            }
+            return
+          }
+          try {
+            const data = await $fetch<OracleStatus[]>('/api/oracle/status')
+            handleData(data)
+          } catch {}
+        }, 10_000)
+      }
+    }
+  }
+
+  function disconnect() {
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
+    connected.value = false
+    if (fallbackPollId) {
+      clearInterval(fallbackPollId)
+      fallbackPollId = null
+    }
+  }
+
+  // Initial fetch for SSR / immediate data
   async function fetchOracles() {
     loading.value = true
     try {
       const data = await $fetch<OracleStatus[]>('/api/oracle/status')
-      checkTransitions(data)
-      oracles.value = data
-    } catch {
-      // keep previous data on error
-    }
+      handleData(data)
+    } catch {}
     loading.value = false
-  }
-
-  function startPolling() {
-    stopPolling()
-    pollId.value = setInterval(() => fetchOracles(), POLL_INTERVAL)
-  }
-
-  function stopPolling() {
-    if (pollId.value) {
-      clearInterval(pollId.value)
-      pollId.value = null
-    }
   }
 
   return {
     oracles,
     loading: readonly(loading),
+    connected: readonly(connected),
     fetchOracles,
-    startPolling,
-    stopPolling,
+    connect,
+    disconnect,
   }
 }

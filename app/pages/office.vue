@@ -13,6 +13,10 @@
         {{ oracles.length }} Oracle{{ oracles.length !== 1 ? 's' : '' }} registered
         &middot;
         {{ onlineCount }} online
+        &middot;
+        <span class="live-indicator" :class="{ 'live-indicator--on': connected }">
+          {{ connected ? 'Live' : 'Polling' }}
+        </span>
       </p>
     </header>
 
@@ -75,7 +79,7 @@
 
 <script setup lang="ts">
 const { isDark, toggleTheme } = useTheme()
-const { oracles, loading, fetchOracles, startPolling, stopPolling } = useOracle()
+const { oracles, loading, connected, fetchOracles, connect, disconnect } = useOracle()
 
 const onlineCount = computed(() => oracles.value.filter(o => o.status === 'online').length)
 
@@ -103,11 +107,11 @@ function timeAgo(isoString: string | null): string {
 
 onMounted(async () => {
   await fetchOracles()
-  startPolling()
+  connect()
 })
 
 onUnmounted(() => {
-  stopPolling()
+  disconnect()
 })
 </script>
 
@@ -174,6 +178,16 @@ onUnmounted(() => {
   color: var(--text-secondary);
   margin: 0.35rem 0 0;
   font-size: 0.9rem;
+}
+
+.live-indicator {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.live-indicator--on {
+  color: #22c55e;
 }
 
 /* Loading */
