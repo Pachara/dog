@@ -46,7 +46,7 @@ const IDLE_PATTERNS = [
   /^claude\s*$/m,                      // just "claude" with no activity
 ]
 
-function detectActivity(sessionName: string): OracleActivity {
+function detectTmuxActivity(sessionName: string): OracleActivity {
   try {
     const output = execSync(
       `tmux capture-pane -t "${sessionName}" -p 2>/dev/null`,
@@ -75,6 +75,36 @@ function detectActivity(sessionName: string): OracleActivity {
   } catch {
     return 'offline'
   }
+}
+
+// Detect activity for Oracles that run directly in a terminal (no tmux)
+// Checks: 1) Claude process with matching cwd, 2) recent git commits
+function detectProcessActivity(oracleDir: string, fullPath: string): OracleActivity {
+  // Check if a Claude process is running in this Oracle's directory
+  try {
+    const psOutput = execSync(
+      `ps aux 2>/dev/null | grep -i claude | grep "${oracleDir}" | grep -v grep`,
+      { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim()
+    if (psOutput) return 'online'
+  } catch {
+    // No matching process — not an error
+  }
+
+  // Fallback: check if there were git commits in the last 10 minutes
+  try {
+    const logOutput = execSync(
+      'git log -1 --format="%aI"',
+      { cwd: fullPath, encoding: 'utf-8', timeout: 5000 },
+    ).trim()
+    if (logOutput) {
+      const commitTime = new Date(logOutput).getTime()
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000
+      if (commitTime > tenMinutesAgo) return 'online'
+    }
+  } catch {}
+
+  return 'idle'
 }
 
 export default defineEventHandler(async (): Promise<OracleStatus[]> => {
@@ -165,9 +195,13 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
     } catch {}
 
     // Detect activity status
-    let status: OracleActivity = 'offline'
+    // 1) Check tmux session (e.g. tony-oracle)
+    // 2) If no tmux session, check for Claude process or recent commits (e.g. my-oracle)
+    let status: OracleActivity
     if (tmuxSessions.includes(dir)) {
-      status = detectActivity(dir)
+      status = detectTmuxActivity(dir)
+    } else {
+      status = detectProcessActivity(dir, fullPath)
     }
 
     oracles.push({
