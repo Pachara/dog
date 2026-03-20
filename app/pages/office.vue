@@ -55,19 +55,7 @@
           </div>
         </div>
 
-        <div v-if="oracle.currentTask" class="card-task">
-          <span class="task-label">Currently:</span>
-          <span class="task-text">{{ oracle.currentTask }}</span>
-        </div>
-        <div v-else-if="oracle.status === 'idle' || oracle.status === 'offline'" class="card-task card-task--sleeping">
-          <span class="task-text">Sleeping...</span>
-        </div>
-
         <div class="card-meta">
-          <div class="meta-item">
-            <span class="meta-icon">&#128193;</span>
-            <span class="meta-value meta-path">{{ oracle.path }}</span>
-          </div>
           <div class="meta-item">
             <span class="meta-icon">&#128233;</span>
             <span class="meta-value">
@@ -76,12 +64,16 @@
           </div>
         </div>
 
-        <div v-if="oracle.lastCommitMessage" class="card-commit">
-          <span class="commit-msg">{{ oracle.lastCommitMessage }}</span>
-          <span class="commit-time">{{ timeAgo(oracle.lastCommitTime) }}</span>
-        </div>
-        <div v-else class="card-commit card-commit--empty">
-          No commits yet
+        <div class="card-footer">
+          <div v-if="oracle.currentTask" class="card-task">
+            <span class="task-text">{{ oracle.currentTask }}</span>
+          </div>
+          <div v-else-if="oracle.status === 'idle' || oracle.status === 'offline'" class="card-task card-task--sleeping">
+            <span class="task-text">Sleeping...</span>
+          </div>
+          <div v-else class="card-task card-task--sleeping">
+            <span class="task-text">Waiting...</span>
+          </div>
         </div>
       </div>
     </div>
@@ -104,18 +96,6 @@ function statusLabel(oracle: { status: string, cpu: number }): string {
   }
 }
 
-function timeAgo(isoString: string | null): string {
-  if (!isoString) return ''
-  const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
-  if (seconds < 5) return 'just now'
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
 
 onMounted(async () => {
   await fetchOracles()
@@ -443,59 +423,30 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* Current task */
+/* Footer */
+.card-footer {
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border-card-default);
+  margin-top: auto;
+}
+
 .card-task {
-  padding: 0.5rem 0.65rem;
-  background: rgba(99, 102, 241, 0.06);
-  border-radius: 10px;
-  border-left: 3px solid #6366f1;
   transition: all 0.3s ease;
-}
-
-.oracle-card--overdrive .card-task {
-  background: rgba(249, 115, 22, 0.08);
-  border-left-color: #f97316;
-}
-
-.card-task--sleeping {
-  background: transparent;
-  border-left-color: var(--border-card-default);
-  opacity: 0.5;
-}
-
-.task-label {
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #6366f1;
-  margin-right: 0.35rem;
-}
-
-.oracle-card--overdrive .task-label {
-  color: #f97316;
 }
 
 .task-text {
   font-size: 0.78rem;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.4;
 }
 
 .card-task--sleeping .task-text {
   font-style: italic;
   color: var(--text-muted);
-}
-
-[data-theme="dark"] .card-task {
-  background: rgba(99, 102, 241, 0.08);
-}
-
-[data-theme="dark"] .oracle-card--overdrive .card-task {
-  background: rgba(249, 115, 22, 0.1);
 }
 
 /* Meta */
@@ -521,43 +472,5 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-.meta-path {
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
-  font-size: 0.7rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-/* Commit */
-.card-commit {
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--border-card-default);
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.commit-msg {
-  font-size: 0.78rem;
-  color: var(--text-primary);
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.commit-time {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.card-commit--empty {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  font-style: italic;
-}
 </style>
