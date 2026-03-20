@@ -47,17 +47,18 @@ async function handleSubmit() {
 .cd-form-card {
   background: var(--bg-card);
   border-radius: 16px;
-  padding: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border: 1.5px solid transparent;
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.06),
     0 4px 12px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.3s ease;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .cd-form-card:focus-within {
   box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.08),
-    0 8px 24px rgba(0, 0, 0, 0.06);
+    0 4px 8px rgba(0, 0, 0, 0.08),
+    0 12px 32px rgba(0, 0, 0, 0.08);
 }
 
 .cd-form {

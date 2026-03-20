@@ -198,8 +198,8 @@ function timeAgo(isoString: string): string {
   margin-top: 0.75rem;
   padding: 0.6rem 0.85rem;
   background: rgba(239, 68, 68, 0.06);
-  border-radius: 10px;
-  font-size: 0.78rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
   color: #ef4444;
   transition: background 0.3s ease;
 }
