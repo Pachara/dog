@@ -55,6 +55,14 @@
           </div>
         </div>
 
+        <div v-if="oracle.currentTask" class="card-task">
+          <span class="task-label">Currently:</span>
+          <span class="task-text">{{ oracle.currentTask }}</span>
+        </div>
+        <div v-else-if="oracle.status === 'idle' || oracle.status === 'offline'" class="card-task card-task--sleeping">
+          <span class="task-text">Sleeping...</span>
+        </div>
+
         <div class="card-meta">
           <div class="meta-item">
             <span class="meta-icon">&#128193;</span>
@@ -433,6 +441,61 @@ onUnmounted(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Current task */
+.card-task {
+  padding: 0.5rem 0.65rem;
+  background: rgba(99, 102, 241, 0.06);
+  border-radius: 10px;
+  border-left: 3px solid #6366f1;
+  transition: all 0.3s ease;
+}
+
+.oracle-card--overdrive .card-task {
+  background: rgba(249, 115, 22, 0.08);
+  border-left-color: #f97316;
+}
+
+.card-task--sleeping {
+  background: transparent;
+  border-left-color: var(--border-card-default);
+  opacity: 0.5;
+}
+
+.task-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6366f1;
+  margin-right: 0.35rem;
+}
+
+.oracle-card--overdrive .task-label {
+  color: #f97316;
+}
+
+.task-text {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-task--sleeping .task-text {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .card-task {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+[data-theme="dark"] .oracle-card--overdrive .card-task {
+  background: rgba(249, 115, 22, 0.1);
 }
 
 /* Meta */

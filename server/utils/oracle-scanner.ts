@@ -11,6 +11,7 @@ export interface OracleStatus {
   path: string
   status: OracleActivity
   cpu: number
+  currentTask: string | null
   inboxCount: number
   lastCommitMessage: string | null
   lastCommitTime: string | null
@@ -21,6 +22,62 @@ const PROJECTS_DIR = '/Users/pachara/Projects'
 interface DetectionResult {
   status: OracleActivity
   cpu: number
+  currentTask: string | null
+}
+
+// Extract what the Oracle is currently doing from tmux pane output
+function extractCurrentTask(sessionName: string): string | null {
+  try {
+    const output = execSync(
+      `tmux capture-pane -t "${sessionName}" -p 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] },
+    )
+    const lines = output.split('\n').filter(l => l.trim())
+
+    // Look for the last Claude action line (⏺ marker) — this shows the current step
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 20); i--) {
+      const line = lines[i].trim()
+      // Claude action descriptions start with ⏺
+      if (line.startsWith('⏺')) {
+        return line.replace(/^⏺\s*/, '').slice(0, 80)
+      }
+    }
+
+    // Look for status verbs (Considering…, Moonwalking…, etc.)
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
+      const line = lines[i].trim()
+      const verbMatch = line.match(/^[·✢✦]\s+(\w+…)/)
+      if (verbMatch) return verbMatch[1]
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+// Extract task from process args for non-tmux Oracles
+function extractProcessTask(oracleDir: string): string | null {
+  try {
+    const output = execSync(
+      `ps aux 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim()
+
+    for (const line of output.split('\n')) {
+      if (line.includes('Claude.app')) continue
+      if (!line.includes(oracleDir)) continue
+      // Extract the prompt text after flags like --dangerously-skip-permissions
+      const match = line.match(/claude\s+(?:--[\w-]+\s+)*(.{10,})/)
+      if (match) {
+        const task = match[1].trim()
+        if (task && !task.startsWith('--')) {
+          return task.slice(0, 80)
+        }
+      }
+    }
+  } catch {}
+  return null
 }
 
 function cpuToStatus(cpu: number): OracleActivity {
@@ -36,7 +93,7 @@ function detectTmuxActivity(sessionName: string): DetectionResult {
       { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] },
     ).trim().split('\n')[0]
 
-    if (!panePid) return { status: 'idle', cpu: 0 }
+    if (!panePid) return { status: 'idle', cpu: 0, currentTask: null }
 
     const psOutput = execSync(
       `ps -eo pid,ppid,pcpu,comm 2>/dev/null`,
@@ -51,7 +108,9 @@ function detectTmuxActivity(sessionName: string): DetectionResult {
       const comm = parts.slice(3).join(' ')
       if (comm !== 'claude') continue
       if (ppid === panePid) {
-        return { status: cpuToStatus(cpu), cpu: Math.round(cpu * 10) / 10 }
+        const status = cpuToStatus(cpu)
+        const currentTask = (status !== 'idle') ? extractCurrentTask(sessionName) : null
+        return { status, cpu: Math.round(cpu * 10) / 10, currentTask }
       }
     }
 
@@ -70,13 +129,15 @@ function detectTmuxActivity(sessionName: string): DetectionResult {
         const cpu = parseFloat(parts[2])
         const cmd = parts.slice(10).join(' ')
         if (!/\bclaude\b/.test(cmd)) continue
-        return { status: cpuToStatus(cpu), cpu: Math.round(cpu * 10) / 10 }
+        const status = cpuToStatus(cpu)
+        const currentTask = (status !== 'idle') ? extractCurrentTask(sessionName) : null
+        return { status, cpu: Math.round(cpu * 10) / 10, currentTask }
       }
     } catch {}
 
-    return { status: 'idle', cpu: 0 }
+    return { status: 'idle', cpu: 0, currentTask: null }
   } catch {
-    return { status: 'offline', cpu: 0 }
+    return { status: 'offline', cpu: 0, currentTask: null }
   }
 }
 
@@ -104,7 +165,9 @@ function detectProcessActivity(oracleDir: string, fullPath: string): DetectionRe
         if (!/\bclaude$/.test(psLine)) continue
         const parts = psLine.trim().split(/\s+/)
         const cpu = parseFloat(parts[1])
-        return { status: cpuToStatus(cpu), cpu: Math.round(cpu * 10) / 10 }
+        const status = cpuToStatus(cpu)
+        const currentTask = (status !== 'idle') ? extractProcessTask(oracleDir) : null
+        return { status, cpu: Math.round(cpu * 10) / 10, currentTask }
       } catch {}
     }
   } catch {}
@@ -118,11 +181,11 @@ function detectProcessActivity(oracleDir: string, fullPath: string): DetectionRe
     if (logOutput) {
       const commitTime = new Date(logOutput).getTime()
       const tenMinutesAgo = Date.now() - 10 * 60 * 1000
-      if (commitTime > tenMinutesAgo) return { status: 'online', cpu: 0 }
+      if (commitTime > tenMinutesAgo) return { status: 'online', cpu: 0, currentTask: null }
     }
   } catch {}
 
-  return { status: 'idle', cpu: 0 }
+  return { status: 'idle', cpu: 0, currentTask: null }
 }
 
 function getTmuxSessions(): string[] {
@@ -219,6 +282,7 @@ export async function scanOracles(): Promise<OracleStatus[]> {
       path: fullPath,
       status: detection.status,
       cpu: detection.cpu,
+      currentTask: detection.currentTask,
       inboxCount,
       lastCommitMessage,
       lastCommitTime,

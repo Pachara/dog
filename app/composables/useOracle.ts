@@ -7,6 +7,7 @@ export interface OracleStatus {
   path: string
   status: OracleActivity
   cpu: number
+  currentTask: string | null
   inboxCount: number
   lastCommitMessage: string | null
   lastCommitTime: string | null
