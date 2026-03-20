@@ -35,16 +35,18 @@
         :class="{ 'oracle-card--online': oracle.online }"
       >
         <div class="card-header">
-          <div class="card-identity">
-            <h2 class="card-name">{{ oracle.name }}</h2>
-            <span class="status-badge" :class="oracle.online ? 'status-badge--on' : 'status-badge--off'">
-              <span class="status-dot" />
-              {{ oracle.online ? 'Online' : 'Offline' }}
-            </span>
+          <OracleAvatar :oracle-id="oracle.id" :online="oracle.online" />
+          <div class="card-header-info">
+            <div class="card-identity">
+              <h2 class="card-name">{{ oracle.name }}</h2>
+              <span class="status-badge" :class="oracle.online ? 'status-badge--on' : 'status-badge--off'">
+                <span class="status-dot" />
+                {{ oracle.online ? 'Online' : 'Offline' }}
+              </span>
+            </div>
+            <p v-if="oracle.role" class="card-role">{{ oracle.role }}</p>
           </div>
         </div>
-
-        <p v-if="oracle.role" class="card-role">{{ oracle.role }}</p>
 
         <div class="card-meta">
           <div class="meta-item">
@@ -265,8 +267,16 @@ onUnmounted(() => {
 /* Card header */
 .card-header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.card-header-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .card-identity {
@@ -332,10 +342,10 @@ onUnmounted(() => {
 
 /* Role */
 .card-role {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-secondary);
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
