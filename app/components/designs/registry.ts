@@ -15,6 +15,8 @@ import Retro90AddUrlForm from './retro90/AddUrlForm.vue'
 import Retro90MonitorList from './retro90/MonitorList.vue'
 import PixelAddUrlForm from './pixel/AddUrlForm.vue'
 import PixelMonitorList from './pixel/MonitorList.vue'
+import CardAddUrlForm from './card/AddUrlForm.vue'
+import CardMonitorList from './card/MonitorList.vue'
 
 export interface DesignComponents {
   AddUrlForm: Component
@@ -37,5 +39,9 @@ export const designRegistry: Record<string, DesignComponents> = {
   pixel: {
     AddUrlForm: PixelAddUrlForm,
     MonitorList: PixelMonitorList,
+  },
+  card: {
+    AddUrlForm: CardAddUrlForm,
+    MonitorList: CardMonitorList,
   },
 }
