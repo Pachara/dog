@@ -17,31 +17,29 @@ export interface OracleStatus {
 
 const PROJECTS_DIR = '/Users/pachara/Projects'
 
+// Patterns that indicate Claude is CURRENTLY working (checked against last 5 lines only).
+// These must be things that only appear while Claude is actively generating,
+// NOT in historical output that scrolled up.
 const ACTIVE_PATTERNS = [
-  /Churned/i,
-  /Baked/i,
-  /Brewed/i,
-  /Cooked/i,
-  /Worked/i,
-  /Crunched/i,
+  // Claude Code completion verbs (appear in status line while working)
+  /Churned for/i,
+  /Baked for/i,
+  /Brewed for/i,
+  /Cooked for/i,
+  /Worked for/i,
+  /Crunched for/i,
+  /Cogitated for/i,
   /Proofing/i,
-  /Drafting/i,
-  /Composing/i,
-  /Thinking/i,
-  /Running/i,
-  /Streaming/i,
-  /⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏/,
-  /●|◐|◓|◑|◒/,
-  /\.\.\./,
-  /█|▓|░/,
-]
-
-const IDLE_PATTERNS = [
-  /^❯\s*$/m,
-  /^\$\s*$/m,
-  /^>\s*$/m,
-  /waiting for input/i,
-  /^claude\s*$/m,
+  /Combobulating/i,
+  // Claude Code active status bar (only visible while Claude is running)
+  /esc to interrupt/,
+  /shift\+tab to cycle/,
+  // Active generation indicators
+  /⏺/,                                // Claude output marker during streaming
+  /Running…|Running\.\.\./,
+  /Thinking…|Thinking\.\.\./,
+  // Spinner characters (braille spinners used by Claude Code)
+  /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/,
 ]
 
 function detectTmuxActivity(sessionName: string): OracleActivity {
@@ -50,16 +48,20 @@ function detectTmuxActivity(sessionName: string): OracleActivity {
       `tmux capture-pane -t "${sessionName}" -p 2>/dev/null`,
       { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] },
     )
-    const lines = output.split('\n').filter(l => l.trim()).slice(-15)
+
+    // Only check the LAST 5 non-empty lines — this is what's currently visible,
+    // not historical scrollback. Default is IDLE unless proven active.
+    const lines = output.split('\n').filter(l => l.trim()).slice(-5)
     const recentText = lines.join('\n')
+
     if (!recentText.trim()) return 'idle'
+
+    // Check for active patterns in the last 5 lines
     for (const pattern of ACTIVE_PATTERNS) {
       if (pattern.test(recentText)) return 'online'
     }
-    const lastLines = lines.slice(-3).join('\n')
-    for (const pattern of IDLE_PATTERNS) {
-      if (pattern.test(lastLines)) return 'idle'
-    }
+
+    // No active indicators found — idle (even if there's text, it's old output)
     return 'idle'
   } catch {
     return 'offline'
