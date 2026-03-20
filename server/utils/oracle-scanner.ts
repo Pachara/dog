@@ -87,13 +87,42 @@ function detectTmuxActivity(sessionName: string): OracleActivity {
 }
 
 function detectProcessActivity(oracleDir: string, fullPath: string): OracleActivity {
+  // Strategy: use lsof to find claude CLI processes whose cwd is this Oracle's
+  // directory, then check CPU usage via ps. This works regardless of how the
+  // process was launched (direct terminal, script, etc.).
   try {
-    const psOutput = execSync(
-      `ps aux 2>/dev/null | grep -i claude | grep "${oracleDir}" | grep -v grep`,
+    // Find PIDs of all processes with cwd in this Oracle's path
+    const lsofOutput = execSync(
+      `lsof -d cwd 2>/dev/null | grep "${oracleDir}"`,
       { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] },
     ).trim()
-    if (psOutput) return 'online'
+
+    if (!lsofOutput) throw new Error('no match')
+
+    // Extract unique PIDs
+    const pids = [...new Set(
+      lsofOutput.split('\n')
+        .map(line => line.trim().split(/\s+/)[1])
+        .filter(Boolean),
+    )]
+
+    // Check each PID — is it a claude CLI process and what's its CPU?
+    for (const pid of pids) {
+      try {
+        const psLine = execSync(
+          `ps -p ${pid} -o pid=,pcpu=,comm= 2>/dev/null`,
+          { encoding: 'utf-8', timeout: 2000, stdio: ['pipe', 'pipe', 'pipe'] },
+        ).trim()
+        // Match only the CLI "claude" binary, not Claude.app
+        if (!/\bclaude$/.test(psLine)) continue
+        const parts = psLine.trim().split(/\s+/)
+        const cpu = parseFloat(parts[1])
+        return cpu > 1 ? 'online' : 'idle'
+      } catch {}
+    }
   } catch {}
+
+  // Fallback: check recent git commits (last 10 minutes)
   try {
     const logOutput = execSync(
       'git log -1 --format="%aI"',
@@ -105,6 +134,7 @@ function detectProcessActivity(oracleDir: string, fullPath: string): OracleActiv
       if (commitTime > tenMinutesAgo) return 'online'
     }
   } catch {}
+
   return 'idle'
 }
 
