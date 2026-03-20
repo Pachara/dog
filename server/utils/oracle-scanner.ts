@@ -17,51 +17,69 @@ export interface OracleStatus {
 
 const PROJECTS_DIR = '/Users/pachara/Projects'
 
-// Patterns that indicate Claude is CURRENTLY working (checked against last 5 lines only).
-// These must be things that only appear while Claude is actively generating,
-// NOT in historical output that scrolled up.
-const ACTIVE_PATTERNS = [
-  // Claude Code completion verbs (appear in status line while working)
-  /Churned for/i,
-  /Baked for/i,
-  /Brewed for/i,
-  /Cooked for/i,
-  /Worked for/i,
-  /Crunched for/i,
-  /Cogitated for/i,
-  /Proofing/i,
-  /Combobulating/i,
-  // Claude Code active status bar (only visible while Claude is running)
-  /esc to interrupt/,
-  /shift\+tab to cycle/,
-  // Active generation indicators
-  /⏺/,                                // Claude output marker during streaming
-  /Running…|Running\.\.\./,
-  /Thinking…|Thinking\.\.\./,
-  // Spinner characters (braille spinners used by Claude Code)
-  /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/,
-]
-
 function detectTmuxActivity(sessionName: string): OracleActivity {
+  // Strategy: find the Claude CLI process running in this tmux session's pane
+  // and check its CPU usage. This is far more reliable than parsing terminal
+  // output, which contains TUI chrome, scrollback history, and unicode noise.
+  //
+  // CPU > 1% = actively working (generating, tool calls, streaming)
+  // CPU ~ 0% = idle at prompt (waiting for user input)
   try {
-    const output = execSync(
-      `tmux capture-pane -t "${sessionName}" -p 2>/dev/null`,
-      { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] },
-    )
+    // Get the PID of the shell in the tmux pane
+    const panePid = execSync(
+      `tmux list-panes -t "${sessionName}" -F "#{pane_pid}" 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim().split('\n')[0]
 
-    // Only check the LAST 5 non-empty lines — this is what's currently visible,
-    // not historical scrollback. Default is IDLE unless proven active.
-    const lines = output.split('\n').filter(l => l.trim()).slice(-5)
-    const recentText = lines.join('\n')
+    if (!panePid) return 'idle'
 
-    if (!recentText.trim()) return 'idle'
+    // Find CLI claude processes (exclude Claude.app Desktop processes).
+    // Match only lines where comm ends with exactly "claude" (the CLI binary).
+    const psOutput = execSync(
+      `ps -eo pid,ppid,pcpu,comm 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim()
 
-    // Check for active patterns in the last 5 lines
-    for (const pattern of ACTIVE_PATTERNS) {
-      if (pattern.test(recentText)) return 'online'
+    // Look for claude CLI process whose parent is the tmux pane shell
+    // The process tree is: tmux → shell (panePid) → claude (child)
+    for (const line of psOutput.split('\n')) {
+      const parts = line.trim().split(/\s+/)
+      if (parts.length < 4) continue
+      const pid = parts[0]
+      const ppid = parts[1]
+      const cpu = parseFloat(parts[2])
+      const comm = parts.slice(3).join(' ')
+      // Match only the CLI claude binary, not Claude.app
+      if (comm !== 'claude') continue
+      // Check if this claude process is a child of the tmux pane shell
+      if (ppid === panePid) {
+        return cpu > 1 ? 'online' : 'idle'
+      }
     }
 
-    // No active indicators found — idle (even if there's text, it's old output)
+    // No claude CLI process found as direct child of tmux pane.
+    // Check if any claude CLI process has the session name in its args
+    // (handles cases where there's an intermediate shell).
+    try {
+      const fullPs = execSync(
+        `ps aux 2>/dev/null`,
+        { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] },
+      ).trim()
+
+      for (const line of fullPs.split('\n')) {
+        // Match lines with the claude CLI (not Claude.app) AND the session/dir name
+        if (!line.includes(sessionName)) continue
+        if (line.includes('Claude.app')) continue
+        const parts = line.trim().split(/\s+/)
+        if (parts.length < 3) continue
+        const cpu = parseFloat(parts[2])
+        const cmd = parts.slice(10).join(' ')
+        if (!/\bclaude\b/.test(cmd)) continue
+        return cpu > 1 ? 'online' : 'idle'
+      }
+    } catch {}
+
+    // Tmux session exists but no claude process — idle
     return 'idle'
   } catch {
     return 'offline'
