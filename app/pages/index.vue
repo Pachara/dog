@@ -3,9 +3,12 @@
     <!-- Nav -->
     <nav class="nav">
       <span class="nav-brand">DOG</span>
-      <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
-        {{ isDark ? '&#9788;' : '&#9790;' }}
-      </button>
+      <div class="nav-right">
+        <NuxtLink to="/office" class="nav-link">Oracle Office</NuxtLink>
+        <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
+          {{ isDark ? '&#9788;' : '&#9790;' }}
+        </button>
+      </div>
     </nav>
 
     <!-- Hero -->
@@ -122,6 +125,24 @@ const { isDark, toggleTheme } = useTheme()
   max-width: 960px;
   margin: 0 auto;
   padding: 1.25rem 1.5rem;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.nav-link {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
 }
 
 .nav-brand {
