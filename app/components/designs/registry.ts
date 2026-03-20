@@ -13,6 +13,8 @@ import ModernAddUrlForm from './modern/AddUrlForm.vue'
 import ModernMonitorList from './modern/MonitorList.vue'
 import Retro90AddUrlForm from './retro90/AddUrlForm.vue'
 import Retro90MonitorList from './retro90/MonitorList.vue'
+import PixelAddUrlForm from './pixel/AddUrlForm.vue'
+import PixelMonitorList from './pixel/MonitorList.vue'
 
 export interface DesignComponents {
   AddUrlForm: Component
@@ -31,5 +33,9 @@ export const designRegistry: Record<string, DesignComponents> = {
   retro90: {
     AddUrlForm: Retro90AddUrlForm,
     MonitorList: Retro90MonitorList,
+  },
+  pixel: {
+    AddUrlForm: PixelAddUrlForm,
+    MonitorList: PixelMonitorList,
   },
 }

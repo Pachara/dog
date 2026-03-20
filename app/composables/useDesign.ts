@@ -15,6 +15,7 @@ const designs: DesignMeta[] = [
   { id: 'classic', label: 'Classic', description: 'Clean cards with left-border status indicators' },
   { id: 'modern', label: 'Modern', description: 'Minimalist rounded cards with gradient accents' },
   { id: 'retro90', label: 'Retro 90s', description: 'Classic 1990s web with neon colors, beveled borders, and marquee' },
+  { id: 'pixel', label: 'Pixel', description: '8-bit retro gaming with pixel fonts, health bars, and NES aesthetics' },
 ]
 
 export function useDesign() {
