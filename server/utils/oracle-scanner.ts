@@ -2,7 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 
-export type OracleActivity = 'online' | 'idle' | 'offline'
+export type OracleActivity = 'overdrive' | 'online' | 'idle' | 'offline'
 
 export interface OracleStatus {
   id: string
@@ -10,6 +10,7 @@ export interface OracleStatus {
   role: string
   path: string
   status: OracleActivity
+  cpu: number
   inboxCount: number
   lastCommitMessage: string | null
   lastCommitTime: string | null
@@ -17,49 +18,44 @@ export interface OracleStatus {
 
 const PROJECTS_DIR = '/Users/pachara/Projects'
 
-function detectTmuxActivity(sessionName: string): OracleActivity {
-  // Strategy: find the Claude CLI process running in this tmux session's pane
-  // and check its CPU usage. This is far more reliable than parsing terminal
-  // output, which contains TUI chrome, scrollback history, and unicode noise.
-  //
-  // CPU > 1% = actively working (generating, tool calls, streaming)
-  // CPU ~ 0% = idle at prompt (waiting for user input)
+interface DetectionResult {
+  status: OracleActivity
+  cpu: number
+}
+
+function cpuToStatus(cpu: number): OracleActivity {
+  if (cpu > 30) return 'overdrive'
+  if (cpu > 0.5) return 'online'
+  return 'idle'
+}
+
+function detectTmuxActivity(sessionName: string): DetectionResult {
   try {
-    // Get the PID of the shell in the tmux pane
     const panePid = execSync(
       `tmux list-panes -t "${sessionName}" -F "#{pane_pid}" 2>/dev/null`,
       { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] },
     ).trim().split('\n')[0]
 
-    if (!panePid) return 'idle'
+    if (!panePid) return { status: 'idle', cpu: 0 }
 
-    // Find CLI claude processes (exclude Claude.app Desktop processes).
-    // Match only lines where comm ends with exactly "claude" (the CLI binary).
     const psOutput = execSync(
       `ps -eo pid,ppid,pcpu,comm 2>/dev/null`,
       { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] },
     ).trim()
 
-    // Look for claude CLI process whose parent is the tmux pane shell
-    // The process tree is: tmux → shell (panePid) → claude (child)
     for (const line of psOutput.split('\n')) {
       const parts = line.trim().split(/\s+/)
       if (parts.length < 4) continue
-      const pid = parts[0]
       const ppid = parts[1]
       const cpu = parseFloat(parts[2])
       const comm = parts.slice(3).join(' ')
-      // Match only the CLI claude binary, not Claude.app
       if (comm !== 'claude') continue
-      // Check if this claude process is a child of the tmux pane shell
       if (ppid === panePid) {
-        return cpu > 1 ? 'online' : 'idle'
+        return { status: cpuToStatus(cpu), cpu: Math.round(cpu * 10) / 10 }
       }
     }
 
-    // No claude CLI process found as direct child of tmux pane.
-    // Check if any claude CLI process has the session name in its args
-    // (handles cases where there's an intermediate shell).
+    // Fallback: search ps aux for claude with session name in args
     try {
       const fullPs = execSync(
         `ps aux 2>/dev/null`,
@@ -67,7 +63,6 @@ function detectTmuxActivity(sessionName: string): OracleActivity {
       ).trim()
 
       for (const line of fullPs.split('\n')) {
-        // Match lines with the claude CLI (not Claude.app) AND the session/dir name
         if (!line.includes(sessionName)) continue
         if (line.includes('Claude.app')) continue
         const parts = line.trim().split(/\s+/)
@@ -75,23 +70,18 @@ function detectTmuxActivity(sessionName: string): OracleActivity {
         const cpu = parseFloat(parts[2])
         const cmd = parts.slice(10).join(' ')
         if (!/\bclaude\b/.test(cmd)) continue
-        return cpu > 1 ? 'online' : 'idle'
+        return { status: cpuToStatus(cpu), cpu: Math.round(cpu * 10) / 10 }
       }
     } catch {}
 
-    // Tmux session exists but no claude process — idle
-    return 'idle'
+    return { status: 'idle', cpu: 0 }
   } catch {
-    return 'offline'
+    return { status: 'offline', cpu: 0 }
   }
 }
 
-function detectProcessActivity(oracleDir: string, fullPath: string): OracleActivity {
-  // Strategy: use lsof to find claude CLI processes whose cwd is this Oracle's
-  // directory, then check CPU usage via ps. This works regardless of how the
-  // process was launched (direct terminal, script, etc.).
+function detectProcessActivity(oracleDir: string, fullPath: string): DetectionResult {
   try {
-    // Find PIDs of all processes with cwd in this Oracle's path
     const lsofOutput = execSync(
       `lsof -d cwd 2>/dev/null | grep "${oracleDir}"`,
       { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] },
@@ -99,30 +89,27 @@ function detectProcessActivity(oracleDir: string, fullPath: string): OracleActiv
 
     if (!lsofOutput) throw new Error('no match')
 
-    // Extract unique PIDs
     const pids = [...new Set(
       lsofOutput.split('\n')
         .map(line => line.trim().split(/\s+/)[1])
         .filter(Boolean),
     )]
 
-    // Check each PID — is it a claude CLI process and what's its CPU?
     for (const pid of pids) {
       try {
         const psLine = execSync(
           `ps -p ${pid} -o pid=,pcpu=,comm= 2>/dev/null`,
           { encoding: 'utf-8', timeout: 2000, stdio: ['pipe', 'pipe', 'pipe'] },
         ).trim()
-        // Match only the CLI "claude" binary, not Claude.app
         if (!/\bclaude$/.test(psLine)) continue
         const parts = psLine.trim().split(/\s+/)
         const cpu = parseFloat(parts[1])
-        return cpu > 1 ? 'online' : 'idle'
+        return { status: cpuToStatus(cpu), cpu: Math.round(cpu * 10) / 10 }
       } catch {}
     }
   } catch {}
 
-  // Fallback: check recent git commits (last 10 minutes)
+  // Fallback: recent git commits
   try {
     const logOutput = execSync(
       'git log -1 --format="%aI"',
@@ -131,11 +118,11 @@ function detectProcessActivity(oracleDir: string, fullPath: string): OracleActiv
     if (logOutput) {
       const commitTime = new Date(logOutput).getTime()
       const tenMinutesAgo = Date.now() - 10 * 60 * 1000
-      if (commitTime > tenMinutesAgo) return 'online'
+      if (commitTime > tenMinutesAgo) return { status: 'online', cpu: 0 }
     }
   } catch {}
 
-  return 'idle'
+  return { status: 'idle', cpu: 0 }
 }
 
 function getTmuxSessions(): string[] {
@@ -221,19 +208,17 @@ export async function scanOracles(): Promise<OracleStatus[]> {
       }
     } catch {}
 
-    let status: OracleActivity
-    if (tmuxSessions.includes(dir)) {
-      status = detectTmuxActivity(dir)
-    } else {
-      status = detectProcessActivity(dir, fullPath)
-    }
+    const detection = tmuxSessions.includes(dir)
+      ? detectTmuxActivity(dir)
+      : detectProcessActivity(dir, fullPath)
 
     oracles.push({
       id: dir,
       name,
       role,
       path: fullPath,
-      status,
+      status: detection.status,
+      cpu: detection.cpu,
       inboxCount,
       lastCommitMessage,
       lastCommitTime,

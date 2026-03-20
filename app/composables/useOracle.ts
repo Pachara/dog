@@ -1,4 +1,4 @@
-export type OracleActivity = 'online' | 'idle' | 'offline'
+export type OracleActivity = 'overdrive' | 'online' | 'idle' | 'offline'
 
 export interface OracleStatus {
   id: string
@@ -6,6 +6,7 @@ export interface OracleStatus {
   role: string
   path: string
   status: OracleActivity
+  cpu: number
   inboxCount: number
   lastCommitMessage: string | null
   lastCommitTime: string | null
@@ -137,7 +138,9 @@ export function useOracle() {
     if (import.meta.server) return
     for (const oracle of newOracles) {
       const prev = previousStatuses.value[oracle.id]
-      if (oracle.status === 'online' && prev && prev !== 'online') {
+      const isActive = oracle.status === 'online' || oracle.status === 'overdrive'
+      const wasActive = prev === 'online' || prev === 'overdrive'
+      if (isActive && prev && !wasActive) {
         playSoundForOracle(oracle.id)
       }
       previousStatuses.value[oracle.id] = oracle.status

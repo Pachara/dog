@@ -36,7 +36,10 @@
         v-for="oracle in oracles"
         :key="oracle.id"
         class="oracle-card"
-        :class="{ 'oracle-card--online': oracle.status === 'online' }"
+        :class="{
+          'oracle-card--online': oracle.status === 'online',
+          'oracle-card--overdrive': oracle.status === 'overdrive',
+        }"
       >
         <div class="card-header">
           <OracleAvatar :oracle-id="oracle.id" :status="oracle.status" />
@@ -45,7 +48,7 @@
               <h2 class="card-name">{{ oracle.name }}</h2>
               <span class="status-badge" :class="'status-badge--' + oracle.status">
                 <span class="status-dot" />
-                {{ statusLabel(oracle.status) }}
+                {{ statusLabel(oracle) }}
               </span>
             </div>
             <p v-if="oracle.role" class="card-role">{{ oracle.role }}</p>
@@ -81,14 +84,15 @@
 const { isDark, toggleTheme } = useTheme()
 const { oracles, loading, connected, fetchOracles, connect, disconnect } = useOracle()
 
-const onlineCount = computed(() => oracles.value.filter(o => o.status === 'online').length)
+const onlineCount = computed(() => oracles.value.filter(o => o.status === 'online' || o.status === 'overdrive').length)
 
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'online': return 'Working'
+function statusLabel(oracle: { status: string, cpu: number }): string {
+  switch (oracle.status) {
+    case 'overdrive': return `Overdrive! ${oracle.cpu}%`
+    case 'online': return `Working ${oracle.cpu}%`
     case 'idle': return 'Idle'
     case 'offline': return 'Offline'
-    default: return status
+    default: return oracle.status
   }
 }
 
@@ -287,6 +291,20 @@ onUnmounted(() => {
   border-color: rgba(34, 197, 94, 0.35);
 }
 
+.oracle-card--overdrive {
+  border-color: rgba(249, 115, 22, 0.35);
+  animation: card-glow 1.5s ease-in-out infinite alternate;
+}
+
+.oracle-card--overdrive:hover {
+  border-color: rgba(249, 115, 22, 0.5);
+}
+
+@keyframes card-glow {
+  0% { box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04), 0 0 8px rgba(249,115,22,0.1); }
+  100% { box-shadow: 0 4px 8px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.08), 0 0 20px rgba(249,115,22,0.2); }
+}
+
 /* Card header */
 .card-header {
   display: flex;
@@ -334,6 +352,28 @@ onUnmounted(() => {
   transition: all 0.3s ease;
 }
 
+.status-badge--overdrive {
+  background: rgba(249, 115, 22, 0.12);
+  color: #c2410c;
+  animation: badge-pulse 0.8s ease-in-out infinite alternate;
+}
+
+.status-badge--overdrive .status-dot {
+  background: #f97316;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.6);
+  animation: dot-overdrive 0.4s ease infinite;
+}
+
+@keyframes badge-pulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.05); }
+}
+
+@keyframes dot-overdrive {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.5); }
+}
+
 .status-badge--online {
   background: rgba(34, 197, 94, 0.1);
   color: #16a34a;
@@ -361,6 +401,11 @@ onUnmounted(() => {
 
 .status-badge--offline .status-dot {
   background: #9ca3af;
+}
+
+[data-theme="dark"] .status-badge--overdrive {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
 }
 
 [data-theme="dark"] .status-badge--online {
