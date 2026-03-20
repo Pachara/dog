@@ -27,16 +27,29 @@ export default defineEventHandler(async (): Promise<OracleStatus[]> => {
 
   const oracleDirs = dirs.filter(d => d.endsWith('-oracle'))
 
-  // Get tmux sessions once
+  // Get tmux sessions once — try multiple approaches for robustness
   let tmuxSessions: string[] = []
   try {
-    const output = execSync('tmux list-sessions -F "#{session_name}"', {
+    const output = execSync('tmux list-sessions -F "#{session_name}" 2>/dev/null', {
       encoding: 'utf-8',
       timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
-    tmuxSessions = output.trim().split('\n').filter(Boolean)
+    tmuxSessions = output.trim().split('\n').map(s => s.trim()).filter(Boolean)
   } catch {
-    // tmux not running or no sessions
+    // Fallback: try parsing default tmux output format "name: N windows ..."
+    try {
+      const output = execSync('tmux list-sessions 2>/dev/null', {
+        encoding: 'utf-8',
+        timeout: 5000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+      tmuxSessions = output.trim().split('\n')
+        .map(line => line.split(':')[0]?.trim())
+        .filter(Boolean)
+    } catch {
+      // tmux not running or no sessions
+    }
   }
 
   for (const dir of oracleDirs) {
