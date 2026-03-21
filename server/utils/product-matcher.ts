@@ -105,22 +105,56 @@ function getWords(text: string): string[] {
 
 function wordOverlap(wordsA: string[], wordsB: string[]): number {
   if (wordsA.length === 0 || wordsB.length === 0) return 0
+  const setA = new Set(wordsA)
   const setB = new Set(wordsB)
+
+  // Count words that appear in both (exact match or substring containment)
   let common = 0
-  for (const w of wordsA) {
-    if (setB.has(w)) common++
+  for (const wa of setA) {
+    for (const wb of setB) {
+      if (wa === wb || (wa.length >= 3 && wb.includes(wa)) || (wb.length >= 3 && wa.includes(wb))) {
+        common++
+        break
+      }
+    }
   }
-  return common / Math.min(wordsA.length, wordsB.length)
+
+  // Use max(unique words) as denominator — stricter than min()
+  // This prevents 1-word matches from scoring 1.0
+  const total = Math.max(setA.size, setB.size)
+  return common / total
 }
 
 // Calculate match score between two products
 function matchScore(a: NormalizedProduct, b: NormalizedProduct): number {
-  // Combine all text for word matching
   const textA = [a.name, a.nameEn, a.brand].filter(Boolean).join(' ')
   const textB = [b.name, b.nameEn, b.brand].filter(Boolean).join(' ')
 
+  // Check if products share a key brand/product word (substring match)
+  // This catches Thai brand names like เฮลบลูบอย matching across stores
+  const normA = textA.toLowerCase()
+  const normB = textB.toLowerCase()
+
+  // Find longest common substring (min 3 chars) — brand detection
+  let hasCommonBrand = false
   const wordsA = getWords(textA)
   const wordsB = getWords(textB)
+
+  for (const wa of wordsA) {
+    if (wa.length < 3) continue
+    for (const wb of wordsB) {
+      if (wb.length < 3) continue
+      // Check substring containment (handles Thai compound words)
+      if (wa.includes(wb) || wb.includes(wa) || wa === wb) {
+        hasCommonBrand = true
+        break
+      }
+    }
+    if (hasCommonBrand) break
+  }
+
+  // If no common brand/keyword at all, very unlikely to be same product
+  if (!hasCommonBrand) return 0
 
   // Word overlap similarity
   const similarity = wordOverlap(wordsA, wordsB)

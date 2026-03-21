@@ -245,7 +245,8 @@ async function doSearch() {
 .store--makro { background: #0055a5; color: white; }
 .store--lotus { background: #dc2626; color: white; }
 
-.side-img { width: 56px; height: 56px; object-fit: contain; border-radius: 6px; }
+.side-img { width: 90px; height: 90px; object-fit: contain; border-radius: 8px; background: #f8f8f8; padding: 4px; }
+[data-theme="dark"] .side-img { background: #1a1a2e; }
 
 .side-pricing { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
 .side-price { font-size: 1rem; font-weight: 700; }
@@ -280,7 +281,8 @@ async function doSearch() {
   border-radius: 3px; text-transform: uppercase;
 }
 
-.single-img { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+.single-img { width: 72px; height: 72px; object-fit: contain; border-radius: 8px; flex-shrink: 0; background: #f8f8f8; padding: 4px; }
+[data-theme="dark"] .single-img { background: #1a1a2e; }
 
 .single-body { flex: 1; min-width: 0; }
 .single-name {
@@ -302,7 +304,7 @@ async function doSearch() {
 /* Responsive */
 @media (max-width: 520px) {
   .match-sides { grid-template-columns: 1fr auto 1fr; gap: 0.25rem; }
-  .side-img { width: 40px; height: 40px; }
+  .side-img { width: 64px; height: 64px; }
   .side-price { font-size: 0.85rem; }
 }
 </style>
