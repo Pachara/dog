@@ -99,6 +99,22 @@
         </div>
         <span class="app-arrow">&rarr;</span>
       </NuxtLink>
+
+      <NuxtLink to="/tops-search" class="app-card">
+        <div class="app-icon app-icon--tops-search">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="32" height="32" rx="6" fill="#e3192c"/>
+            <circle cx="18" cy="18" r="7" fill="none" stroke="white" stroke-width="2.5"/>
+            <line x1="23" y1="23" x2="30" y2="30" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="30" cy="10" r="4" fill="#fbbf24"/>
+          </svg>
+        </div>
+        <div class="app-info">
+          <h2 class="app-name">Tops Search</h2>
+          <p class="app-desc">Search Tops products — client-side (Cloudflare protected)</p>
+        </div>
+        <span class="app-arrow">&rarr;</span>
+      </NuxtLink>
     </div>
 
     <footer class="home-footer">
@@ -230,8 +246,11 @@ const { isDark, toggleTheme } = useTheme()
 
 [data-theme="dark"] .app-icon--office { background: #422006; }
 [data-theme="dark"] .app-icon--makro { background: #1e3a5f; }
+.app-icon--tops-search { background: #fee2e2; }
+
 [data-theme="dark"] .app-icon--makro-search { background: #1e3a5f; }
 [data-theme="dark"] .app-icon--lotus-search { background: #450a0a; }
+[data-theme="dark"] .app-icon--tops-search { background: #450a0a; }
 
 .app-info {
   flex: 1;
