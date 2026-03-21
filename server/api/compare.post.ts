@@ -1,5 +1,3 @@
-import type { NormalizedProduct } from '~/server/utils/product-matcher'
-
 export default defineEventHandler(async (event) => {
   const body = await readBody<{ q: string }>(event)
 
@@ -28,21 +26,28 @@ export default defineEventHandler(async (event) => {
     }).then(r => r.ok ? r.json() : { data: { products: [] } }).catch(() => ({ data: { products: [] } })),
   ])
 
-  // Parse Makro products
+  // Parse Makro products — compute per-unit price from unitFactor
   const makroProducts: NormalizedProduct[] = (makroRaw.hits || []).map((hit: any) => {
     const doc = hit.document || hit
     const images = doc.images || []
     const makroId = doc.makroId || ''
     const id = doc.id || ''
+    const displayPrice = doc.displayPrice || 0
+    const unitFactor = doc.unitFactor || 1
+    const perUnitPrice = unitFactor > 1 ? Math.round((displayPrice / unitFactor) * 100) / 100 : displayPrice
+    const originalPrice = doc.originalPrice || 0
+
     return {
       id: `makro-${id}`,
       name: doc.title || '',
       nameEn: doc.titleEn || doc.title || '',
       brand: doc.brand || doc.brandEn || '',
-      price: doc.displayPrice || 0,
-      originalPrice: doc.originalPrice || 0,
-      discount: doc.originalPrice > doc.displayPrice
-        ? `-${Math.round(((doc.originalPrice - doc.displayPrice) / doc.originalPrice) * 100)}%`
+      price: displayPrice,
+      perUnitPrice,
+      unitFactor,
+      originalPrice,
+      discount: originalPrice > displayPrice
+        ? `-${Math.round(((originalPrice - displayPrice) / originalPrice) * 100)}%`
         : '',
       image: images[0] || '',
       link: makroId ? `https://www.makro.pro/th/p/${makroId}-${id}` : '#',
@@ -50,18 +55,21 @@ export default defineEventHandler(async (event) => {
     }
   }).filter((p: NormalizedProduct) => p.name && p.price > 0)
 
-  // Parse Lotus products
+  // Parse Lotus products — single unit, perUnitPrice = price
   const lotusProducts: NormalizedProduct[] = (lotusRaw?.data?.products || []).map((item: any) => {
     const pr = item.priceRange?.minimumPrice || {}
     const price = pr.finalPrice?.value || 0
     const original = pr.regularPrice?.value || 0
     const pctOff = pr.discount?.percentOff || 0
+
     return {
       id: `lotus-${item.id || item.urlKey || ''}`,
       name: item.name || '',
       nameEn: '',
       brand: '',
       price,
+      perUnitPrice: price,
+      unitFactor: 1,
       originalPrice: original,
       discount: pctOff > 0 ? `-${Math.round(pctOff)}%` : '',
       image: item.thumbnail?.url || '',
@@ -70,7 +78,7 @@ export default defineEventHandler(async (event) => {
     }
   }).filter((p: NormalizedProduct) => p.name && p.price > 0)
 
-  // Match products using the matcher utility (auto-imported by Nitro)
+  // Match products (auto-imported by Nitro from server/utils/)
   const results = matchProducts(makroProducts, lotusProducts)
 
   return {

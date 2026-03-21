@@ -49,7 +49,8 @@
               <span class="side-store store--makro">Makro</span>
               <img v-if="item.makro.image" :src="item.makro.image" class="side-img" loading="lazy" />
               <div class="side-pricing">
-                <span class="side-price">{{ formatPrice(item.makro.price) }}</span>
+                <span class="side-price">{{ formatPrice(item.makro.perUnitPrice) }}</span>
+                <span v-if="item.makro.unitFactor > 1" class="side-pack">/unit (pack of {{ item.makro.unitFactor }} = {{ formatPrice(item.makro.price) }})</span>
                 <span v-if="item.makro.originalPrice > item.makro.price" class="side-original">{{ formatPrice(item.makro.originalPrice) }}</span>
               </div>
               <span v-if="item.cheaper === 'makro'" class="winner-badge">Cheaper!</span>
@@ -64,7 +65,7 @@
               <span class="side-store store--lotus">Lotus's</span>
               <img v-if="item.lotus.image" :src="item.lotus.image" class="side-img" loading="lazy" />
               <div class="side-pricing">
-                <span class="side-price">{{ formatPrice(item.lotus.price) }}</span>
+                <span class="side-price">{{ formatPrice(item.lotus.perUnitPrice) }}</span>
                 <span v-if="item.lotus.originalPrice > item.lotus.price" class="side-original">{{ formatPrice(item.lotus.originalPrice) }}</span>
               </div>
               <span v-if="item.cheaper === 'lotus'" class="winner-badge">Cheaper!</span>
@@ -98,7 +99,8 @@ const { isDark, toggleTheme } = useTheme()
 
 interface NormalizedProduct {
   id: string; name: string; nameEn: string; brand: string
-  price: number; originalPrice: number; discount: string
+  price: number; perUnitPrice: number; unitFactor: number
+  originalPrice: number; discount: string
   image: string; link: string; store: 'makro' | 'lotus'
 }
 interface MatchedPair {
@@ -249,6 +251,7 @@ async function doSearch() {
 .side-price { font-size: 1rem; font-weight: 700; }
 .side--winner .side-price { color: #16a34a; }
 [data-theme="dark"] .side--winner .side-price { color: #4ade80; }
+.side-pack { font-size: 0.55rem; color: var(--text-muted); text-align: center; }
 .side-original { font-size: 0.65rem; color: var(--text-muted); text-decoration: line-through; }
 
 .winner-badge {
