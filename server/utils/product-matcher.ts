@@ -1,10 +1,11 @@
 // Product matching — matches same products across Makro and Lotus's
-// Uses word overlap + size-aware matching (tested by Peter with มิตรผล: 7/20 matched)
+// Key insight: Thai product names often have NO spaces between words,
+// so word-level overlap fails. Uses substring containment instead.
 
 export interface NormalizedProduct {
   id: string
-  name: string
-  nameEn: string
+  name: string       // Thai name (primary for matching)
+  nameEn: string     // English name (Makro only)
   brand: string
   price: number
   perUnitPrice: number
@@ -32,142 +33,152 @@ export interface UnmatchedProduct {
 
 export type CompareResult = MatchedPair | UnmatchedProduct
 
-// --- Size extraction ---
-// Extract weight/volume from product name: "1 กก.", "500g", "1.5 ลิตร", etc.
-interface SizeInfo {
-  value: number
-  unit: string // normalized: 'g', 'kg', 'ml', 'l'
+// --- Normalize text for comparison ---
+// Strip punctuation, numbers, units — keep only "word content"
+// CRITICAL: Normalize Thai Unicode (Makro uses decomposed ํ+า, Lotus uses composed ำ)
+function normalizeText(text: string): string {
+  return text
+    .normalize('NFC')
+    .replace(/\u0e4d\u0e32/g, '\u0e33')     // Thai: ํ+า → ำ (Makro uses decomposed form)
+    .toLowerCase()
+    .replace(/\d+/g, ' ')                    // remove numbers
+    .replace(/[,.\-\/()[\]{}'"!@#$%^&*+=;:<>?~`|\\×x]/g, ' ')
+    .replace(/กก\.|กิโลกรัม|กรัม|กร\./gi, ' ')  // Thai units
+    .replace(/\b(kg|g|ml|l|oz|cc)\b/gi, ' ')     // English units
+    .replace(/แพ็ค|pack|ชิ้น|กล่อง|ถุง|ขวด|ซอง|box|bag|ขนาด/gi, ' ')
+    .replace(/\s+/g, '')                     // collapse ALL whitespace
+    .trim()
 }
 
-function extractSize(text: string): SizeInfo | null {
-  const t = text.toLowerCase()
-  // Patterns: "500 g", "1.5 กก.", "250 ml", "1 ลิตร", "500กรัม"
-  const patterns: [RegExp, string, number][] = [
-    [/(\d+\.?\d*)\s*(?:กก\.|กิโลกรัม|kg)/i, 'kg', 1],
-    [/(\d+\.?\d*)\s*(?:กรัม|กร\.|g(?:ram)?)\b/i, 'g', 1],
-    [/(\d+\.?\d*)\s*(?:ลิตร|ล\.|liter|litre|lt)\b/i, 'l', 1],
-    [/(\d+\.?\d*)\s*(?:มล\.|มิลลิลิตร|ml)\b/i, 'ml', 1],
-    [/(\d+\.?\d*)\s*(?:ออนซ์|oz)\b/i, 'oz', 1],
-  ]
+// Substring containment score between two normalized strings
+// "มิตรผลน้ำตาลทราย" vs "มิตรผลน้ำตาลทรายบริสุทธิ์" → high score
+function substringScore(a: string, b: string): number {
+  if (!a || !b) return 0
+  // Check if one contains the other
+  if (a.includes(b) || b.includes(a)) {
+    const shorter = Math.min(a.length, b.length)
+    const longer = Math.max(a.length, b.length)
+    return shorter / longer  // 1.0 = identical, 0.5 = half contained
+  }
 
-  for (const [regex, unit, mult] of patterns) {
-    const match = t.match(regex)
-    if (match) {
-      return { value: parseFloat(match[1]) * mult, unit }
+  // Find longest common substring
+  const shorter = a.length <= b.length ? a : b
+  const longer = a.length > b.length ? a : b
+  let bestLen = 0
+
+  for (let i = 0; i < shorter.length; i++) {
+    for (let len = shorter.length - i; len > bestLen; len--) {
+      const sub = shorter.substring(i, i + len)
+      if (longer.includes(sub)) {
+        bestLen = len
+        break
+      }
     }
+  }
+
+  if (bestLen < 3) return 0
+  return bestLen / Math.max(a.length, b.length)
+}
+
+// Extract all numbers from text
+function extractNumbers(text: string): number[] {
+  const matches = text.normalize('NFC').replace(/\u0e4d\u0e32/g, '\u0e33').match(/\d+\.?\d*/g)
+  if (!matches) return []
+  return matches
+    .map(m => parseFloat(m))
+    .filter(n => n > 0 && n < 100000)
+    .sort((a, b) => a - b)
+}
+
+// Number overlap score
+function numberOverlap(nums1: number[], nums2: number[]): number {
+  if (nums1.length === 0 && nums2.length === 0) return 0.3 // neutral
+  if (nums1.length === 0 || nums2.length === 0) return 0
+
+  let matches = 0
+  const used = new Set<number>()
+  for (const n1 of nums1) {
+    for (let i = 0; i < nums2.length; i++) {
+      if (!used.has(i) && Math.abs(n1 - nums2[i]) < 0.01) {
+        matches++
+        used.add(i)
+        break
+      }
+    }
+  }
+  return matches / Math.max(nums1.length, nums2.length)
+}
+
+// Size extraction for size-aware matching
+interface SizeInfo { value: number; unit: string }
+
+function extractSize(text: string): SizeInfo | null {
+  const t = text.normalize('NFC').replace(/\u0e4d\u0e32/g, '\u0e33').toLowerCase()
+  const patterns: [RegExp, string][] = [
+    [/(\d+\.?\d*)\s*(?:กก\.|กิโลกรัม|kg)\b/i, 'kg'],
+    [/(\d+\.?\d*)\s*(?:กรัม|กร\.|g(?:ram)?)\b/i, 'g'],
+    [/(\d+\.?\d*)\s*(?:ลิตร|ล\.|liter|litre|lt)\b/i, 'l'],
+    [/(\d+\.?\d*)\s*(?:มล\.|มิลลิลิตร|ml)\b/i, 'ml'],
+  ]
+  for (const [regex, unit] of patterns) {
+    const match = t.match(regex)
+    if (match) return { value: parseFloat(match[1]), unit }
   }
   return null
 }
 
-function sameSize(a: SizeInfo | null, b: SizeInfo | null): number {
-  if (!a && !b) return 0 // no size info, neutral
-  if (!a || !b) return 0 // one has size, one doesn't, neutral
-
-  // Normalize to same unit for comparison
-  const toGrams = (s: SizeInfo) => {
+function sizeAdjustment(a: SizeInfo | null, b: SizeInfo | null): number {
+  if (!a || !b) return 0
+  const toBase = (s: SizeInfo) => {
     if (s.unit === 'kg') return s.value * 1000
-    if (s.unit === 'g') return s.value
     if (s.unit === 'l') return s.value * 1000
-    if (s.unit === 'ml') return s.value
-    if (s.unit === 'oz') return s.value * 28.35
     return s.value
   }
-
-  // Only compare same category (weight vs volume)
-  const isWeight = (u: string) => ['g', 'kg', 'oz'].includes(u)
+  const isWeight = (u: string) => ['g', 'kg'].includes(u)
   const isVolume = (u: string) => ['ml', 'l'].includes(u)
-  if (isWeight(a.unit) !== isWeight(b.unit) && isVolume(a.unit) !== isVolume(b.unit)) {
-    return 0 // different categories, neutral
-  }
+  if (isWeight(a.unit) !== isWeight(b.unit) && isVolume(a.unit) !== isVolume(b.unit)) return 0
 
-  const ga = toGrams(a)
-  const gb = toGrams(b)
-  const ratio = Math.min(ga, gb) / Math.max(ga, gb)
-
-  if (ratio > 0.9) return 0.2   // same size → bonus
-  if (ratio < 0.5) return -0.3  // very different size → penalty
-  return 0 // somewhat similar, neutral
+  const ratio = Math.min(toBase(a), toBase(b)) / Math.max(toBase(a), toBase(b))
+  if (ratio > 0.9) return 0.15   // same size → bonus
+  if (ratio < 0.5) return -0.3   // very different → penalty
+  return 0
 }
 
-// --- Word overlap matching ---
-
-function normalizeForMatch(text: string): string {
-  let t = text.toLowerCase()
-  // Strip punctuation, collapse whitespace
-  t = t.replace(/[,.\-\/()[\]{}'"!@#$%^&*+=;:<>?~`|\\]/g, ' ')
-  t = t.replace(/\s+/g, ' ').trim()
-  return t
-}
-
-function getWords(text: string): string[] {
-  return normalizeForMatch(text).split(' ').filter(w => w.length > 0)
-}
-
-function wordOverlap(wordsA: string[], wordsB: string[]): number {
-  if (wordsA.length === 0 || wordsB.length === 0) return 0
-  const setA = new Set(wordsA)
-  const setB = new Set(wordsB)
-
-  // Count words that appear in both (exact match or substring containment)
-  let common = 0
-  for (const wa of setA) {
-    for (const wb of setB) {
-      if (wa === wb || (wa.length >= 3 && wb.includes(wa)) || (wb.length >= 3 && wa.includes(wb))) {
-        common++
-        break
-      }
-    }
-  }
-
-  // Use max(unique words) as denominator — stricter than min()
-  // This prevents 1-word matches from scoring 1.0
-  const total = Math.max(setA.size, setB.size)
-  return common / total
-}
-
-// Calculate match score between two products
+// --- Main match score ---
 function matchScore(a: NormalizedProduct, b: NormalizedProduct): number {
-  const textA = [a.name, a.nameEn, a.brand].filter(Boolean).join(' ')
-  const textB = [b.name, b.nameEn, b.brand].filter(Boolean).join(' ')
+  // 1. Compare Thai text using substring containment (NOT word overlap)
+  //    This handles Thai text with no spaces: "มิตรผลน้ำตาลทราย" vs "มิตรผลน้ำตาลทรายบริสุทธิ์"
+  const thaiA = normalizeText(a.name + ' ' + a.brand)
+  const thaiB = normalizeText(b.name + ' ' + b.brand)
+  const thaiScore = substringScore(thaiA, thaiB)
 
-  // Check if products share a key brand/product word (substring match)
-  // This catches Thai brand names like เฮลบลูบอย matching across stores
-  const normA = textA.toLowerCase()
-  const normB = textB.toLowerCase()
-
-  // Find longest common substring (min 3 chars) — brand detection
-  let hasCommonBrand = false
-  const wordsA = getWords(textA)
-  const wordsB = getWords(textB)
-
-  for (const wa of wordsA) {
-    if (wa.length < 3) continue
-    for (const wb of wordsB) {
-      if (wb.length < 3) continue
-      // Check substring containment (handles Thai compound words)
-      if (wa.includes(wb) || wb.includes(wa) || wa === wb) {
-        hasCommonBrand = true
-        break
-      }
-    }
-    if (hasCommonBrand) break
+  // 2. Compare English text if available (word-level is fine for English)
+  let engScore = 0
+  if (a.nameEn && b.nameEn) {
+    const engNormA = normalizeText(a.nameEn)
+    const engNormB = normalizeText(b.nameEn)
+    engScore = substringScore(engNormA, engNormB)
   }
 
-  // If no common brand/keyword at all, very unlikely to be same product
-  if (!hasCommonBrand) return 0
+  // Take best language match
+  const textScore = Math.max(thaiScore, engScore)
 
-  // Word overlap similarity
-  const similarity = wordOverlap(wordsA, wordsB)
+  // 3. Number matching (language-independent)
+  const numsA = extractNumbers(a.name + ' ' + a.nameEn)
+  const numsB = extractNumbers(b.name + ' ' + b.nameEn)
+  const numScore = numberOverlap(numsA, numsB)
 
-  // Size-aware bonus/penalty
-  const sizeA = extractSize(textA)
-  const sizeB = extractSize(textB)
-  const sizeAdj = sameSize(sizeA, sizeB)
+  // 4. Size adjustment
+  const sizeAdj = sizeAdjustment(
+    extractSize(a.name + ' ' + a.nameEn),
+    extractSize(b.name + ' ' + b.nameEn),
+  )
 
-  return similarity + sizeAdj
+  // Weighted: text similarity is king, numbers help confirm
+  return textScore * 0.55 + numScore * 0.30 + sizeAdj
 }
 
-// Match products from two stores
+// --- Match products ---
 export function matchProducts(
   makroProducts: NormalizedProduct[],
   lotusProducts: NormalizedProduct[],
@@ -176,7 +187,6 @@ export function matchProducts(
   const usedLotus = new Set<number>()
   const usedMakro = new Set<number>()
 
-  // For each Makro product, find best Lotus match
   for (let mi = 0; mi < makroProducts.length; mi++) {
     const makro = makroProducts[mi]
     let bestScore = 0
@@ -191,20 +201,18 @@ export function matchProducts(
       }
     }
 
-    // Threshold: 0.45+ = match (tested by Peter)
-    if (bestScore >= 0.45 && bestIdx >= 0) {
+    if (bestScore >= 0.40 && bestIdx >= 0) {
       const lotus = lotusProducts[bestIdx]
       usedLotus.add(bestIdx)
       usedMakro.add(mi)
 
-      // Compare per-unit prices (Makro sells bulk packs)
-      const makroComparePrice = makro.perUnitPrice
-      const lotusComparePrice = lotus.perUnitPrice
-      const diff = makroComparePrice - lotusComparePrice
+      const makroCompare = makro.perUnitPrice
+      const lotusCompare = lotus.perUnitPrice
+      const diff = makroCompare - lotusCompare
 
       results.push({
         type: 'matched',
-        name: makro.nameEn || makro.name || lotus.name,
+        name: makro.name || makro.nameEn,
         makro,
         lotus,
         cheaper: Math.abs(diff) < 0.5 ? 'equal' : diff < 0 ? 'makro' : 'lotus',
@@ -213,19 +221,13 @@ export function matchProducts(
     }
   }
 
-  // Add unmatched
   for (let mi = 0; mi < makroProducts.length; mi++) {
-    if (!usedMakro.has(mi)) {
-      results.push({ type: 'unmatched', product: makroProducts[mi] })
-    }
+    if (!usedMakro.has(mi)) results.push({ type: 'unmatched', product: makroProducts[mi] })
   }
   for (let li = 0; li < lotusProducts.length; li++) {
-    if (!usedLotus.has(li)) {
-      results.push({ type: 'unmatched', product: lotusProducts[li] })
-    }
+    if (!usedLotus.has(li)) results.push({ type: 'unmatched', product: lotusProducts[li] })
   }
 
-  // Sort: matched first (by price diff desc), then unmatched
   results.sort((a, b) => {
     if (a.type === 'matched' && b.type !== 'matched') return -1
     if (a.type !== 'matched' && b.type === 'matched') return 1
