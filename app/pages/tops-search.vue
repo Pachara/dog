@@ -7,17 +7,16 @@
 
     <header class="store-header">
       <h1 class="store-title store-title--tops">Tops <span>Search</span></h1>
-      <p v-if="buildIdStatus" class="build-status" :class="buildIdStatus">{{ buildIdMsg }}</p>
       <form class="search-form" @submit.prevent="doSearch">
         <input v-model="query" type="text" class="search-input" placeholder="Search Tops products..." autofocus />
-        <button type="submit" class="search-btn search-btn--tops" :disabled="searching || !query.trim() || !buildId">
+        <button type="submit" class="search-btn search-btn--tops" :disabled="searching || !query.trim()">
           {{ searching ? '...' : 'Search' }}
         </button>
       </form>
     </header>
 
     <div v-if="searching" class="status-msg">Searching Tops...</div>
-    <div v-else-if="searched && products.length === 0" class="status-msg">No products found</div>
+    <div v-else-if="searched && products.length === 0 && !error" class="status-msg">No products found</div>
     <div v-if="error" class="status-msg error-msg">{{ error }}</div>
     <p v-if="products.length > 0" class="result-count">{{ totalProducts }} products found (showing {{ products.length }})</p>
 
@@ -59,69 +58,28 @@ const totalProducts = ref(0)
 const searching = ref(false)
 const searched = ref(false)
 const error = ref('')
-const buildId = ref('')
-const buildIdStatus = ref<string>('')
-const buildIdMsg = ref('')
 
 function formatPrice(n: number): string {
   if (!n) return '-'
   return n.toLocaleString('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 })
 }
 
-async function fetchBuildId() {
-  buildIdStatus.value = 'loading'
-  buildIdMsg.value = 'Fetching Tops build ID...'
-  try {
-    // Fetch the Tops homepage from the browser (passes Cloudflare)
-    const html = await fetch('https://www.tops.co.th/en', {
-      credentials: 'omit',
-    }).then(r => r.text())
-
-    // Extract buildId from __NEXT_DATA__
-    const match = html.match(/"buildId"\s*:\s*"([^"]+)"/)
-    if (match) {
-      buildId.value = match[1]
-      buildIdStatus.value = 'ok'
-      buildIdMsg.value = `Build ID: ${buildId.value.slice(0, 8)}...`
-    } else {
-      buildIdStatus.value = 'error'
-      buildIdMsg.value = 'Could not find build ID — Cloudflare may be blocking'
-    }
-  } catch (e: any) {
-    buildIdStatus.value = 'error'
-    buildIdMsg.value = `Failed to reach tops.co.th: ${e.message || 'CORS or network error'}`
-  }
-}
-
 async function doSearch() {
-  if (!query.value.trim() || !buildId.value) return
+  if (!query.value.trim()) return
   searching.value = true
   searched.value = false
   error.value = ''
 
   try {
-    const keyword = encodeURIComponent(query.value.trim())
-    const url = `https://www.tops.co.th/_next/data/${buildId.value}/en/search/${keyword}.json`
+    const data = await $fetch<any>('/api/tops/search', {
+      params: { q: query.value },
+    })
 
-    const response = await fetch(url, { credentials: 'omit' })
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        // buildId expired, try to refresh
-        error.value = 'Build ID expired, refreshing...'
-        await fetchBuildId()
-        if (buildId.value) {
-          searching.value = false
-          return doSearch()
-        }
-      }
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    const data = await response.json()
+    // Response: pageProps.data.products[]
     const pageProps = data?.pageProps || {}
-    const productList = pageProps?.initialData?.products || pageProps?.products || []
-    totalProducts.value = pageProps?.initialData?.totalProducts || pageProps?.totalProducts || productList.length
+    const productData = pageProps?.data || pageProps?.initialData || pageProps || {}
+    const productList = productData?.products || []
+    totalProducts.value = productData?.totalProducts || productList.length
 
     products.value = productList.map((item: any) => ({
       sku: item.sku || '',
@@ -131,23 +89,19 @@ async function doSearch() {
       originalPrice: item.originalPrice || 0,
       priceSaved: item.priceSaved || 0,
       image: item.pimImage ? `https://www.tops.co.th${item.pimImage}` : '',
-      link: item.slug ? `https://www.tops.co.th/en/${item.slug}` : '#',
+      link: item.slugName ? `https://www.tops.co.th/en/${item.slugName}` : '#',
       unitName: item.unitName || '',
       inStock: item.stockAvail !== 0,
       category: item.categoryLevel1 || '',
     })).filter((p: Product) => p.name)
   } catch (e: any) {
-    if (!error.value) error.value = `Search failed: ${e.message}`
+    error.value = `Search failed: ${e.data?.statusMessage || e.message || 'Unknown error'}`
     products.value = []
   }
 
   searching.value = false
   searched.value = true
 }
-
-onMounted(() => {
-  fetchBuildId()
-})
 </script>
 
 <style scoped>
@@ -158,14 +112,9 @@ onMounted(() => {
 .theme-toggle { background: var(--bg-btn-secondary); border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-primary); }
 
 .store-header { text-align: center; margin-bottom: 1.5rem; }
-.store-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 0.5rem; }
+.store-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 1rem; }
 .store-title--tops span { color: #e3192c; }
 [data-theme="dark"] .store-title--tops span { color: #f87171; }
-
-.build-status { font-size: 0.7rem; margin: 0 0 0.75rem; }
-.build-status.loading { color: var(--text-muted); }
-.build-status.ok { color: #16a34a; }
-.build-status.error { color: #dc2626; }
 
 .search-form { display: flex; gap: 0.5rem; max-width: 500px; margin: 0 auto; }
 .search-input { flex: 1; padding: 0.7rem 1rem; border: 1.5px solid var(--border-input); border-radius: 10px; font-size: 0.9rem; outline: none; background: var(--bg-input); color: var(--text-primary); }
