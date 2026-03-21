@@ -109,6 +109,17 @@
           <div v-else class="card-task card-task--sleeping">
             <span class="task-text">Waiting...</span>
           </div>
+
+          <!-- Activity timeline dots -->
+          <div v-if="getTimeline(oracle.id).length > 1" class="timeline-dots">
+            <div
+              v-for="(entry, i) in getTimeline(oracle.id)"
+              :key="i"
+              class="tl-dot"
+              :class="'tl-dot--' + entry.status"
+              :title="entry.label"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -117,7 +128,7 @@
 
 <script setup lang="ts">
 const { isDark, toggleTheme } = useTheme()
-const { oracles, loading, connected, fetchOracles, connect, disconnect } = useOracle()
+const { oracles, loading, connected, statusHistory, fetchOracles, connect, disconnect } = useOracle()
 
 const onlineCount = computed(() => oracles.value.filter(o => o.status === 'online' || o.status === 'overdrive').length)
 
@@ -172,6 +183,22 @@ function uptimeFor(id: string): string {
   if (mins < 60) return `${mins}m`
   const hours = Math.floor(mins / 60)
   return `${hours}h ${mins % 60}m`
+}
+
+// --- Activity timeline ---
+function getTimeline(id: string): { status: string; label: string }[] {
+  const hist = statusHistory.value[id] || []
+  const recent = hist.slice(-8)
+  return recent.map((entry, i) => {
+    const next = recent[i + 1]
+    const duration = next ? next.at - entry.at : Date.now() - entry.at
+    const secs = Math.floor(duration / 1000)
+    let dur = ''
+    if (secs < 60) dur = `${secs}s`
+    else if (secs < 3600) dur = `${Math.floor(secs / 60)}m`
+    else dur = `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`
+    return { status: entry.status, label: `${entry.status} ${dur}` }
+  })
 }
 
 function statusLabel(oracle: { status: string, cpu: number }): string {
@@ -670,6 +697,31 @@ onUnmounted(() => {
   font-style: italic;
   color: var(--text-muted);
 }
+
+/* Activity timeline dots */
+.timeline-dots {
+  display: flex;
+  gap: 3px;
+  margin-top: 0.4rem;
+  align-items: center;
+}
+
+.tl-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  cursor: default;
+  transition: transform 0.15s;
+}
+
+.tl-dot:hover {
+  transform: scale(1.5);
+}
+
+.tl-dot--online { background: #22c55e; }
+.tl-dot--overdrive { background: #f97316; box-shadow: 0 0 4px rgba(249, 115, 22, 0.4); }
+.tl-dot--idle { background: #eab308; }
+.tl-dot--offline { background: #94a3b8; }
 
 /* Meta */
 .card-meta {

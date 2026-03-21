@@ -132,6 +132,7 @@ export function useOracle() {
   const loading = ref(false)
   const connected = ref(false)
   const previousStatuses = ref<Record<string, OracleActivity>>({})
+  const statusHistory = ref<Record<string, { status: OracleActivity; at: number }[]>>({})
   let eventSource: EventSource | null = null
   let fallbackPollId: ReturnType<typeof setInterval> | null = null
 
@@ -148,8 +149,20 @@ export function useOracle() {
     }
   }
 
+  function trackHistory(data: OracleStatus[]) {
+    for (const oracle of data) {
+      const hist = statusHistory.value[oracle.id] ??= []
+      const last = hist[hist.length - 1]
+      if (!last || last.status !== oracle.status) {
+        hist.push({ status: oracle.status, at: Date.now() })
+        if (hist.length > 20) hist.shift()
+      }
+    }
+  }
+
   function handleData(data: OracleStatus[]) {
     checkTransitions(data)
+    trackHistory(data)
     oracles.value = data
     loading.value = false
   }
@@ -221,6 +234,7 @@ export function useOracle() {
     oracles,
     loading: readonly(loading),
     connected: readonly(connected),
+    statusHistory: readonly(statusHistory),
     fetchOracles,
     connect,
     disconnect,
