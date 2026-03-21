@@ -17,6 +17,7 @@ const designs: DesignMeta[] = [
   { id: 'retro90', label: 'Retro 90s', description: 'Classic 1990s web with neon colors, beveled borders, and marquee' },
   { id: 'pixel', label: 'Pixel', description: '8-bit retro gaming with pixel fonts, health bars, and NES aesthetics' },
   { id: 'card', label: 'Card', description: 'Elevated cards with shadows, generous spacing, and smooth hover animations' },
+  { id: 'icon', label: 'Icon', description: 'App-style favicon grid like iOS home screen' },
 ]
 
 export function useDesign() {
