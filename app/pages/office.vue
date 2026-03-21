@@ -17,6 +17,8 @@
         <span class="live-indicator" :class="{ 'live-indicator--on': connected }">
           {{ connected ? 'Live' : 'Polling' }}
         </span>
+        &middot;
+        <span class="updated-indicator">{{ updatedAgo }}</span>
       </p>
     </header>
 
@@ -55,12 +57,24 @@
           </div>
         </div>
 
+        <!-- CPU mini bar -->
+        <div v-if="oracle.status === 'online' || oracle.status === 'overdrive'" class="cpu-bar-wrap">
+          <div class="cpu-bar-track">
+            <div class="cpu-bar-fill" :class="cpuBarClass(oracle.cpu)" :style="{ width: Math.min(oracle.cpu, 100) + '%' }" />
+          </div>
+          <span class="cpu-bar-label">{{ oracle.cpu }}%</span>
+        </div>
+
         <div class="card-meta">
           <div class="meta-item">
             <span class="meta-icon">&#128233;</span>
             <span class="meta-value">
               {{ oracle.inboxCount }} message{{ oracle.inboxCount !== 1 ? 's' : '' }} in inbox
             </span>
+          </div>
+          <div v-if="oracle.lastCommitMessage" class="meta-item">
+            <span class="meta-icon">&#128221;</span>
+            <span class="meta-value meta-commit">{{ oracle.lastCommitMessage }}</span>
           </div>
         </div>
 
@@ -88,22 +102,43 @@ const onlineCount = computed(() => oracles.value.filter(o => o.status === 'onlin
 
 function statusLabel(oracle: { status: string, cpu: number }): string {
   switch (oracle.status) {
-    case 'overdrive': return `Overdrive! ${oracle.cpu}%`
-    case 'online': return `Working ${oracle.cpu}%`
+    case 'overdrive': return 'Overdrive!'
+    case 'online': return 'Working'
     case 'idle': return 'Idle'
     case 'offline': return 'Offline'
     default: return oracle.status
   }
 }
 
+function cpuBarClass(cpu: number): string {
+  if (cpu > 30) return 'cpu-bar--overdrive'
+  if (cpu > 10) return 'cpu-bar--active'
+  return 'cpu-bar--low'
+}
+
+// Updated ago indicator
+const lastUpdatedAt = ref(Date.now())
+const updatedAgo = ref('just now')
+let tickId: ReturnType<typeof setInterval> | null = null
+
+watch(oracles, () => { lastUpdatedAt.value = Date.now() }, { deep: true })
+
+function updateTick() {
+  const secs = Math.floor((Date.now() - lastUpdatedAt.value) / 1000)
+  if (secs < 3) updatedAgo.value = 'just now'
+  else if (secs < 60) updatedAgo.value = `${secs}s ago`
+  else updatedAgo.value = `${Math.floor(secs / 60)}m ago`
+}
 
 onMounted(async () => {
   await fetchOracles()
   connect()
+  tickId = setInterval(updateTick, 1000)
 })
 
 onUnmounted(() => {
   disconnect()
+  if (tickId) clearInterval(tickId)
 })
 </script>
 
@@ -180,6 +215,11 @@ onUnmounted(() => {
 
 .live-indicator--on {
   color: #22c55e;
+}
+
+.updated-indicator {
+  font-size: 0.7rem;
+  color: var(--text-muted);
 }
 
 /* Loading */
@@ -421,6 +461,53 @@ onUnmounted(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* CPU mini bar */
+.cpu-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cpu-bar-track {
+  flex: 1;
+  height: 5px;
+  background: var(--border-card-default);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cpu-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease, background 0.3s;
+}
+
+.cpu-bar--low { background: #22c55e; }
+.cpu-bar--active { background: #eab308; }
+.cpu-bar--overdrive { background: #f97316; animation: cpu-glow 0.8s ease infinite alternate; }
+
+@keyframes cpu-glow {
+  0% { box-shadow: none; }
+  100% { box-shadow: 0 0 6px rgba(249, 115, 22, 0.5); }
+}
+
+.cpu-bar-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+/* Commit in meta */
+.meta-commit {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-style: italic;
 }
 
 /* Footer */
