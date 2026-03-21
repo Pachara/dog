@@ -71,14 +71,15 @@
                 {{ statusLabel(oracle) }}
               </span>
             </div>
-            <p v-if="oracle.statusText" class="card-status-text">
-              {{ oracle.statusEmoji }} {{ oracle.statusText }}
-            </p>
-            <p v-else-if="oracle.mood" class="card-status-text card-status-text--mood">
-              {{ moodEmoji(oracle.mood) }} {{ oracle.mood }}
-            </p>
             <p v-if="oracle.role" class="card-role">{{ oracle.role }}</p>
           </div>
+        </div>
+
+        <!-- Mood status bar (Option A — dedicated section) -->
+        <div v-if="oracle.statusText || oracle.mood" class="mood-bar" :class="oracle.mood ? 'mood-bar--' + oracle.mood : ''">
+          <span class="mood-bar-text">
+            {{ oracle.statusEmoji || moodEmoji(oracle.mood) }} {{ oracle.statusText || oracle.mood }}
+          </span>
         </div>
 
         <!-- CPU mini bar -->
@@ -553,21 +554,34 @@ onUnmounted(() => {
 .mood-ring--creative { box-shadow: 0 0 0 2px #8b5cf6, 0 0 8px rgba(139, 92, 246, 0.3); }
 .mood-ring--frustrated { box-shadow: 0 0 0 2px #ef4444, 0 0 8px rgba(239, 68, 68, 0.3); }
 
-/* Status text */
-.card-status-text {
-  font-size: 0.72rem;
-  font-style: italic;
-  color: var(--text-secondary);
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 200px;
+/* Mood status bar (Option A) */
+.mood-bar {
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  transition: background 0.3s;
+  background: var(--bg-btn-secondary);
 }
 
-.card-status-text--mood {
-  text-transform: capitalize;
-  color: var(--text-muted);
+.mood-bar--focused { background: rgba(34, 197, 94, 0.08); }
+.mood-bar--curious { background: rgba(59, 130, 246, 0.08); }
+.mood-bar--excited { background: rgba(249, 115, 22, 0.08); }
+.mood-bar--tired { background: rgba(100, 116, 139, 0.08); }
+.mood-bar--chill { background: rgba(6, 182, 212, 0.08); }
+.mood-bar--creative { background: rgba(139, 92, 246, 0.08); }
+.mood-bar--frustrated { background: rgba(239, 68, 68, 0.08); }
+
+[data-theme="dark"] .mood-bar--focused { background: rgba(34, 197, 94, 0.12); }
+[data-theme="dark"] .mood-bar--curious { background: rgba(59, 130, 246, 0.12); }
+[data-theme="dark"] .mood-bar--excited { background: rgba(249, 115, 22, 0.12); }
+[data-theme="dark"] .mood-bar--tired { background: rgba(100, 116, 139, 0.12); }
+[data-theme="dark"] .mood-bar--chill { background: rgba(6, 182, 212, 0.12); }
+[data-theme="dark"] .mood-bar--creative { background: rgba(139, 92, 246, 0.12); }
+[data-theme="dark"] .mood-bar--frustrated { background: rgba(239, 68, 68, 0.12); }
+
+.mood-bar-text {
+  color: var(--text-primary);
 }
 
 .card-name {
