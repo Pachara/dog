@@ -1,11 +1,18 @@
 import { eq } from 'drizzle-orm'
+import * as v from 'valibot'
+
+const CheckSchema = v.object({
+  url: v.pipe(v.string(), v.minLength(1)),
+  id: v.optional(v.string()),
+})
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody<{ url: string; id?: string }>(event)
-
-  if (!body.url) {
+  const raw = await readBody(event)
+  const result = v.safeParse(CheckSchema, raw)
+  if (!result.success) {
     throw createError({ statusCode: 400, statusMessage: 'URL is required' })
   }
+  const body = result.output
 
   let targetUrl = body.url
   if (!/^https?:\/\//i.test(targetUrl)) {

@@ -37,9 +37,17 @@ export function useDesign() {
 
   function setDesign(id: string) {
     if (!designs.some(d => d.id === id)) return
-    currentDesign.value = id
-    if (!import.meta.server) {
-      localStorage.setItem(STORAGE_KEY, id)
+    const apply = () => {
+      currentDesign.value = id
+      if (!import.meta.server) {
+        localStorage.setItem(STORAGE_KEY, id)
+      }
+    }
+    // Use View Transitions API for smooth design switching
+    if (!import.meta.server && (document as any).startViewTransition) {
+      (document as any).startViewTransition(apply)
+    } else {
+      apply()
     }
   }
 

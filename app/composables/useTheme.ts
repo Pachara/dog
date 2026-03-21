@@ -13,11 +13,19 @@ export function useTheme() {
   }
 
   function toggleTheme() {
-    isDark.value = !isDark.value
-    if (!import.meta.server) {
-      localStorage.setItem(STORAGE_KEY, isDark.value ? 'dark' : 'light')
+    const apply = () => {
+      isDark.value = !isDark.value
+      if (!import.meta.server) {
+        localStorage.setItem(STORAGE_KEY, isDark.value ? 'dark' : 'light')
+      }
+      applyTheme()
     }
-    applyTheme()
+    // Use View Transitions API for smooth dark/light switch
+    if (!import.meta.server && (document as any).startViewTransition) {
+      (document as any).startViewTransition(apply)
+    } else {
+      apply()
+    }
   }
 
   function applyTheme() {
