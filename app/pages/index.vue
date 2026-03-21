@@ -64,8 +64,8 @@
           </svg>
         </div>
         <div class="app-info">
-          <h2 class="app-name">Makro Search</h2>
-          <p class="app-desc">Search Makro Pro products with live prices, images, and stock</p>
+          <h2 class="app-name">Price Compare</h2>
+          <p class="app-desc">Compare prices between Makro and Lotus's — find the best deal</p>
         </div>
         <span class="app-arrow">&rarr;</span>
       </NuxtLink>
