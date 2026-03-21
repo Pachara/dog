@@ -6,14 +6,7 @@
   >
     <button class="icon-remove" title="Remove" @click.stop="removeUrl(entry.id)">&times;</button>
     <div class="icon-favicon">
-      <img
-        :src="faviconUrl"
-        :alt="displayName"
-        width="48"
-        height="48"
-        loading="lazy"
-        @error="($event.target as HTMLImageElement).src = fallbackIcon"
-      />
+      <img :src="iconUrl" :alt="displayName" width="48" height="48" />
     </div>
     <span class="icon-name">{{ displayName }}</span>
     <DesignsIconStatusBadge :status="entry.status" />
@@ -43,6 +36,7 @@
 <script setup lang="ts">
 const props = defineProps<{ entry: MonitorEntry }>()
 const { removeUrl } = useMonitor()
+const { generateDataUrl } = useIconGenerator()
 const expanded = ref(false)
 
 const displayUrl = computed(() => {
@@ -55,22 +49,7 @@ const displayName = computed(() => {
   return url.replace(/^www\./, '').split('/')[0].split(':')[0]
 })
 
-const domain = computed(() => {
-  const url = props.entry.normalizedUrl || props.entry.url
-  try {
-    return new URL(url.startsWith('http') ? url : `https://${url}`).hostname
-  } catch {
-    return displayName.value
-  }
-})
-
-const faviconUrl = computed(() => {
-  return `https://www.google.com/s2/favicons?domain=${domain.value}&sz=64`
-})
-
-const fallbackIcon = 'data:image/svg+xml,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%236366f1"/><text x="32" y="40" text-anchor="middle" fill="white" font-size="28" font-family="sans-serif">?</text></svg>'
-)
+const iconUrl = computed(() => generateDataUrl(displayName.value))
 
 function formatMs(ms: number | null): string {
   if (ms === null) return '-'
@@ -141,7 +120,6 @@ function timeAgo(iso: string | null): string {
   width: 48px;
   height: 48px;
   border-radius: 10px;
-  object-fit: contain;
 }
 
 .icon-name {
