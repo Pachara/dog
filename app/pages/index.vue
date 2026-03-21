@@ -69,6 +69,36 @@
         </div>
         <span class="app-arrow">&rarr;</span>
       </NuxtLink>
+
+      <NuxtLink to="/makro-search" class="app-card">
+        <div class="app-icon app-icon--makro-search">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="32" height="32" rx="6" fill="#0055a5"/>
+            <circle cx="18" cy="18" r="7" fill="none" stroke="white" stroke-width="2.5"/>
+            <line x1="23" y1="23" x2="30" y2="30" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="app-info">
+          <h2 class="app-name">Makro Search</h2>
+          <p class="app-desc">Search Makro Pro products with per-unit pricing</p>
+        </div>
+        <span class="app-arrow">&rarr;</span>
+      </NuxtLink>
+
+      <NuxtLink to="/lotus-search" class="app-card">
+        <div class="app-icon app-icon--lotus-search">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="32" height="32" rx="6" fill="#dc2626"/>
+            <circle cx="18" cy="18" r="7" fill="none" stroke="white" stroke-width="2.5"/>
+            <line x1="23" y1="23" x2="30" y2="30" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="app-info">
+          <h2 class="app-name">Lotus's Search</h2>
+          <p class="app-desc">Search Lotus's products and prices</p>
+        </div>
+        <span class="app-arrow">&rarr;</span>
+      </NuxtLink>
     </div>
 
     <footer class="home-footer">
@@ -195,8 +225,13 @@ const { isDark, toggleTheme } = useTheme()
 .app-icon--office { background: #fef3c7; }
 .app-icon--makro { background: #dbeafe; }
 
+.app-icon--makro-search { background: #dbeafe; }
+.app-icon--lotus-search { background: #fee2e2; }
+
 [data-theme="dark"] .app-icon--office { background: #422006; }
 [data-theme="dark"] .app-icon--makro { background: #1e3a5f; }
+[data-theme="dark"] .app-icon--makro-search { background: #1e3a5f; }
+[data-theme="dark"] .app-icon--lotus-search { background: #450a0a; }
 
 .app-info {
   flex: 1;
