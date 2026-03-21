@@ -128,6 +128,69 @@
       </g>
     </svg>
 
+    <!-- Richard: F1 Racer with helmet and racing suit -->
+    <svg v-else-if="character === 'richard'" class="avatar-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+      <!-- Body: racing suit -->
+      <rect class="av-body" x="24" y="42" width="32" height="26" rx="4" fill="#dc2626" />
+      <!-- Racing stripes on suit -->
+      <rect x="24" y="46" width="32" height="3" fill="#fbbf24" opacity="0.8" />
+      <rect x="24" y="58" width="32" height="2" fill="#1e293b" />
+      <!-- Sponsor patches -->
+      <rect x="28" y="50" width="8" height="5" rx="1" fill="white" opacity="0.3" />
+      <rect x="40" y="51" width="6" height="4" rx="1" fill="white" opacity="0.2" />
+      <!-- Neck -->
+      <rect x="36" y="38" width="8" height="6" rx="2" fill="#fbbf24" />
+      <!-- Helmet -->
+      <path class="av-head" d="M20,30 Q20,12 40,12 Q60,12 60,30 L60,34 Q60,38 56,38 L24,38 Q20,38 20,34 Z" fill="#dc2626" />
+      <!-- Helmet stripe -->
+      <path d="M28,14 Q40,10 52,14" fill="none" stroke="#fbbf24" stroke-width="2.5" />
+      <path d="M24,18 Q40,13 56,18" fill="none" stroke="white" stroke-width="1" opacity="0.4" />
+      <!-- Visor -->
+      <g v-if="isWorking">
+        <path d="M24,26 L56,26 L54,34 L26,34 Z" fill="#1e293b" opacity="0.85" />
+        <!-- Eyes visible through visor -->
+        <circle class="av-eye av-eye--blink" cx="33" cy="30" r="1.5" fill="#22d3ee" />
+        <circle class="av-eye av-eye--blink" cx="47" cy="30" r="1.5" fill="#22d3ee" />
+        <!-- Visor reflection -->
+        <path d="M28,27 L42,27 L41,29 L29,29 Z" fill="white" opacity="0.15" />
+      </g>
+      <g v-else>
+        <!-- Visor closed/dark when sleeping -->
+        <path d="M24,26 L56,26 L54,34 L26,34 Z" fill="#1e293b" opacity="0.95" />
+        <path d="M28,27 L42,27 L41,29 L29,29 Z" fill="white" opacity="0.08" />
+      </g>
+      <!-- Steering wheel (working) -->
+      <g v-if="isWorking" class="av-steering">
+        <circle cx="40" cy="60" r="8" fill="none" stroke="#1e293b" stroke-width="2.5" />
+        <circle cx="40" cy="60" r="2" fill="#1e293b" />
+        <line x1="40" y1="52" x2="40" y2="56" stroke="#1e293b" stroke-width="1.5" />
+        <line x1="33" y1="63" x2="36" y2="61" stroke="#1e293b" stroke-width="1.5" />
+        <line x1="47" y1="63" x2="44" y2="61" stroke="#1e293b" stroke-width="1.5" />
+      </g>
+      <!-- Checkered flag (overdrive only) -->
+      <g v-if="isOverdrive" class="av-flag">
+        <line x1="60" y1="10" x2="60" y2="30" stroke="#666" stroke-width="1.5" />
+        <rect x="60" y="10" width="4" height="4" fill="#1a1a1a" />
+        <rect x="64" y="10" width="4" height="4" fill="white" />
+        <rect x="60" y="14" width="4" height="4" fill="white" />
+        <rect x="64" y="14" width="4" height="4" fill="#1a1a1a" />
+        <rect x="60" y="18" width="4" height="4" fill="#1a1a1a" />
+        <rect x="64" y="18" width="4" height="4" fill="white" />
+      </g>
+      <!-- Speed lines (overdrive) -->
+      <g v-if="isOverdrive" class="av-speed-lines">
+        <line x1="2" y1="26" x2="14" y2="26" stroke="#fbbf24" stroke-width="1.2" opacity="0.4" />
+        <line x1="4" y1="36" x2="16" y2="36" stroke="#fbbf24" stroke-width="1" opacity="0.3" />
+        <line x1="2" y1="50" x2="12" y2="50" stroke="#fbbf24" stroke-width="1.2" opacity="0.35" />
+        <line x1="64" y1="46" x2="76" y2="46" stroke="#fbbf24" stroke-width="1" opacity="0.3" />
+      </g>
+      <!-- Exhaust flames (overdrive) -->
+      <g v-if="isOverdrive" class="av-exhaust">
+        <ellipse cx="16" cy="66" rx="3" ry="5" fill="#f97316" opacity="0.6" />
+        <ellipse cx="16" cy="65" rx="1.5" ry="3" fill="#fbbf24" opacity="0.5" />
+      </g>
+    </svg>
+
     <!-- Fallback: generic Oracle -->
     <svg v-else class="avatar-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
       <rect class="av-body" x="24" y="42" width="32" height="26" rx="4" fill="#8b5cf6" />
@@ -175,6 +238,7 @@ const sceneClasses = computed(() => ({
 const characterMap: Record<string, string> = {
   'my-oracle': 'peter',
   'tony-oracle': 'tony',
+  'richard-oracle': 'richard',
 }
 
 const character = computed(() => characterMap[props.oracleId] ?? 'generic')
@@ -252,6 +316,49 @@ const character = computed(() => characterMap[props.oracleId] ?? 'generic')
 @keyframes av-sway {
   0%, 100% { transform: rotate(0deg); }
   50% { transform: rotate(3deg); }
+}
+
+/* Richard steering wheel wiggle */
+.avatar-scene:not(.avatar-scene--offline) .av-steering {
+  animation: av-steer 1.2s ease-in-out infinite;
+  transform-origin: 40px 60px;
+}
+
+@keyframes av-steer {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+/* Richard checkered flag wave */
+.av-flag {
+  animation: av-flag-wave 0.8s ease-in-out infinite alternate;
+  transform-origin: 60px 20px;
+}
+
+@keyframes av-flag-wave {
+  0% { transform: rotate(-5deg); }
+  100% { transform: rotate(5deg); }
+}
+
+/* Richard exhaust flames */
+.av-exhaust {
+  animation: av-exhaust-flicker 0.3s ease infinite;
+}
+
+@keyframes av-exhaust-flicker {
+  0%, 100% { opacity: 0.6; transform: scaleY(1); }
+  50% { opacity: 0.3; transform: scaleY(1.3); }
+}
+
+/* Richard overdrive: faster steering */
+.avatar-scene--overdrive .av-steering {
+  animation: av-steer-fast 0.4s ease-in-out infinite !important;
+  transform-origin: 40px 60px;
+}
+
+@keyframes av-steer-fast {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
 }
 
 .av-wave {
