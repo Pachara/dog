@@ -60,7 +60,9 @@
         }"
       >
         <div class="card-header">
-          <OracleAvatar :oracle-id="oracle.id" :status="oracle.status" />
+          <div class="avatar-mood-wrap" :class="oracle.mood ? 'mood-ring--' + oracle.mood : ''">
+            <OracleAvatar :oracle-id="oracle.id" :status="oracle.status" />
+          </div>
           <div class="card-header-info">
             <div class="card-identity">
               <h2 class="card-name">{{ oracle.name }}</h2>
@@ -69,6 +71,12 @@
                 {{ statusLabel(oracle) }}
               </span>
             </div>
+            <p v-if="oracle.statusText" class="card-status-text">
+              {{ oracle.statusEmoji }} {{ oracle.statusText }}
+            </p>
+            <p v-else-if="oracle.mood" class="card-status-text card-status-text--mood">
+              {{ moodEmoji(oracle.mood) }} {{ oracle.mood }}
+            </p>
             <p v-if="oracle.role" class="card-role">{{ oracle.role }}</p>
           </div>
         </div>
@@ -199,6 +207,19 @@ function getTimeline(id: string): { status: string; label: string }[] {
     else dur = `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`
     return { status: entry.status, label: `${entry.status} ${dur}` }
   })
+}
+
+function moodEmoji(mood: string | null): string {
+  const map: Record<string, string> = {
+    focused: '\u{1F3AF}',
+    curious: '\u{1F50D}',
+    excited: '\u{1F525}',
+    tired: '\u{1F634}',
+    chill: '\u{1F60E}',
+    creative: '\u{1F3A8}',
+    frustrated: '\u{1F624}',
+  }
+  return map[mood || ''] || ''
 }
 
 function statusLabel(oracle: { status: string, cpu: number }): string {
@@ -515,6 +536,38 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
+}
+
+/* Mood ring around avatar */
+.avatar-mood-wrap {
+  border-radius: 50%;
+  padding: 3px;
+  transition: box-shadow 0.3s ease;
+}
+
+.mood-ring--focused { box-shadow: 0 0 0 2px #22c55e, 0 0 8px rgba(34, 197, 94, 0.3); }
+.mood-ring--curious { box-shadow: 0 0 0 2px #3b82f6, 0 0 8px rgba(59, 130, 246, 0.3); }
+.mood-ring--excited { box-shadow: 0 0 0 2px #f97316, 0 0 8px rgba(249, 115, 22, 0.3); }
+.mood-ring--tired { box-shadow: 0 0 0 2px #64748b, 0 0 8px rgba(100, 116, 139, 0.2); }
+.mood-ring--chill { box-shadow: 0 0 0 2px #06b6d4, 0 0 8px rgba(6, 182, 212, 0.3); }
+.mood-ring--creative { box-shadow: 0 0 0 2px #8b5cf6, 0 0 8px rgba(139, 92, 246, 0.3); }
+.mood-ring--frustrated { box-shadow: 0 0 0 2px #ef4444, 0 0 8px rgba(239, 68, 68, 0.3); }
+
+/* Status text */
+.card-status-text {
+  font-size: 0.72rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.card-status-text--mood {
+  text-transform: capitalize;
+  color: var(--text-muted);
 }
 
 .card-name {

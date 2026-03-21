@@ -1,5 +1,7 @@
 export type OracleActivity = 'overdrive' | 'online' | 'idle' | 'offline'
 
+export type OracleMood = 'focused' | 'curious' | 'excited' | 'tired' | 'chill' | 'creative' | 'frustrated' | null
+
 export interface OracleStatus {
   id: string
   name: string
@@ -8,6 +10,9 @@ export interface OracleStatus {
   status: OracleActivity
   cpu: number
   currentTask: string | null
+  mood: OracleMood
+  statusText: string | null
+  statusEmoji: string | null
   inboxCount: number
   lastCommitMessage: string | null
   lastCommitTime: string | null

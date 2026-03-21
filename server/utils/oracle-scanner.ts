@@ -4,6 +4,8 @@ import { execSync } from 'node:child_process'
 
 export type OracleActivity = 'overdrive' | 'online' | 'idle' | 'offline'
 
+export type OracleMood = 'focused' | 'curious' | 'excited' | 'tired' | 'chill' | 'creative' | 'frustrated' | null
+
 export interface OracleStatus {
   id: string
   name: string
@@ -12,6 +14,9 @@ export interface OracleStatus {
   status: OracleActivity
   cpu: number
   currentTask: string | null
+  mood: OracleMood
+  statusText: string | null
+  statusEmoji: string | null
   inboxCount: number
   lastCommitMessage: string | null
   lastCommitTime: string | null
@@ -275,6 +280,23 @@ export async function scanOracles(): Promise<OracleStatus[]> {
       ? detectTmuxActivity(dir)
       : detectProcessActivity(dir, fullPath)
 
+    // Read mood/status from ψ/active/status.json
+    let mood: OracleMood = null
+    let statusText: string | null = null
+    let statusEmoji: string | null = null
+    try {
+      const statusJson = await readFile(join(fullPath, 'ψ', 'active', 'status.json'), 'utf-8')
+      const moodData = JSON.parse(statusJson)
+      // Check if expired
+      if (!moodData.statusExpiresAt || new Date(moodData.statusExpiresAt) > new Date()) {
+        mood = moodData.mood || null
+        statusText = moodData.statusText || null
+        statusEmoji = moodData.statusEmoji || null
+      }
+    } catch {
+      // No status file or invalid JSON — defaults to null
+    }
+
     oracles.push({
       id: dir,
       name,
@@ -283,6 +305,9 @@ export async function scanOracles(): Promise<OracleStatus[]> {
       status: detection.status,
       cpu: detection.cpu,
       currentTask: detection.currentTask,
+      mood,
+      statusText,
+      statusEmoji,
       inboxCount,
       lastCommitMessage,
       lastCommitTime,
