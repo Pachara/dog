@@ -27,12 +27,12 @@
 </template>
 
 <script setup lang="ts">
-const { entries, isChecking, loadFromStorage, checkAll, startPolling, stopPolling } = useMonitor()
+const { entries, isChecking, fetchEntries, checkAll, startPolling, stopPolling } = useMonitor()
 const { isDark, toggleTheme } = useTheme()
 const { currentComponents } = useDesign()
 
-onMounted(() => {
-  loadFromStorage()
+onMounted(async () => {
+  await fetchEntries()
   if (entries.value.length > 0) {
     checkAll()
   }

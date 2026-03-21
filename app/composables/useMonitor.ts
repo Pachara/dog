@@ -17,6 +17,12 @@ export function useMonitor() {
   const isChecking = ref(false)
   const pollIntervalId = ref<ReturnType<typeof setInterval> | null>(null)
 
+  // Cache to localStorage as offline fallback
+  function saveToStorage() {
+    if (import.meta.server) return
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.value))
+  }
+
   function loadFromStorage() {
     if (import.meta.server) return
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -29,37 +35,62 @@ export function useMonitor() {
     }
   }
 
-  function saveToStorage() {
-    if (import.meta.server) return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.value))
+  // Fetch entries from server DB
+  async function fetchEntries() {
+    try {
+      const data = await $fetch<MonitorEntry[]>('/api/urls')
+      entries.value = data
+      saveToStorage()
+    } catch {
+      // Server unavailable — fall back to localStorage
+      loadFromStorage()
+    }
   }
 
   async function addUrl(url: string) {
-    const entry: MonitorEntry = {
-      id: crypto.randomUUID(),
-      url: url.trim(),
-      normalizedUrl: '',
-      status: 'pending',
-      statusCode: null,
-      responseTime: null,
-      checkedAt: null,
-      error: null,
+    try {
+      // Add to server DB
+      const entry = await $fetch<MonitorEntry>('/api/urls', {
+        method: 'POST',
+        body: { url },
+      })
+      entries.value.push(entry)
+      saveToStorage()
+      // Immediately check the new URL
+      await checkUrl(entry)
+    } catch {
+      // Fallback: add client-side only
+      const entry: MonitorEntry = {
+        id: crypto.randomUUID(),
+        url: url.trim(),
+        normalizedUrl: '',
+        status: 'pending',
+        statusCode: null,
+        responseTime: null,
+        checkedAt: null,
+        error: null,
+      }
+      entries.value.push(entry)
+      saveToStorage()
+      await checkUrl(entry)
     }
-    entries.value.push(entry)
-    saveToStorage()
-    await checkUrl(entry)
   }
 
-  function removeUrl(id: string) {
+  async function removeUrl(id: string) {
     entries.value = entries.value.filter(e => e.id !== id)
     saveToStorage()
+    try {
+      await $fetch(`/api/urls/${id}`, { method: 'DELETE' })
+    } catch {
+      // DB delete failed — entry already removed from UI
+    }
   }
 
   async function checkUrl(entry: MonitorEntry) {
     try {
       const result = await $fetch('/api/check', {
         method: 'POST',
-        body: { url: entry.url },
+        body: { url: entry.url, id: entry.id },
       })
       entry.normalizedUrl = result.url
       entry.status = result.status as 'up' | 'down'
@@ -97,6 +128,7 @@ export function useMonitor() {
   return {
     entries,
     isChecking: readonly(isChecking),
+    fetchEntries,
     loadFromStorage,
     addUrl,
     removeUrl,
