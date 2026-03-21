@@ -109,7 +109,17 @@ export function useMonitor() {
   async function checkAll() {
     if (isChecking.value || entries.value.length === 0) return
     isChecking.value = true
-    await Promise.allSettled(entries.value.map(e => checkUrl(e)))
+    // Concurrent limiter: max 10 parallel checks (prevents overload with many URLs)
+    const tasks = entries.value.map(e => () => checkUrl(e))
+    const limit = 10
+    let idx = 0
+    async function worker() {
+      while (idx < tasks.length) {
+        const i = idx++
+        await tasks[i]()
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, () => worker()))
     isChecking.value = false
   }
 

@@ -7,12 +7,22 @@ const CheckSchema = v.object({
 })
 
 export default defineEventHandler(async (event) => {
+  // Rate limiting: 10 requests per minute per IP
+  const ip = getRequestIP(event, { xForwardedFor: true }) || 'unknown'
+  const rateCheck = checkRateLimit(ip, 10, 60_000)
+  if (!rateCheck.allowed) {
+    throw createError({
+      statusCode: 429,
+      statusMessage: `Too many requests. Try again in ${Math.ceil(rateCheck.resetMs / 1000)}s`,
+    })
+  }
+
   const raw = await readBody(event)
-  const result = v.safeParse(CheckSchema, raw)
-  if (!result.success) {
+  const parsed = v.safeParse(CheckSchema, raw)
+  if (!parsed.success) {
     throw createError({ statusCode: 400, statusMessage: 'URL is required' })
   }
-  const body = result.output
+  const body = parsed.output
 
   let targetUrl = body.url
   if (!/^https?:\/\//i.test(targetUrl)) {
@@ -27,7 +37,7 @@ export default defineEventHandler(async (event) => {
 
   const start = Date.now()
 
-  let result: {
+  let checkResult: {
     url: string
     status: 'up' | 'down'
     statusCode: number | null
@@ -54,7 +64,7 @@ export default defineEventHandler(async (event) => {
 
     clearTimeout(timeoutId)
 
-    result = {
+    checkResult = {
       url: targetUrl,
       status: response.ok ? 'up' : 'down',
       statusCode: response.status,
@@ -62,7 +72,7 @@ export default defineEventHandler(async (event) => {
       checkedAt: new Date().toISOString(),
     }
   } catch (error: any) {
-    result = {
+    checkResult = {
       url: targetUrl,
       status: 'down',
       statusCode: null,
@@ -72,23 +82,33 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Save result to DB if an entry ID was provided
+  // Save to DB + history if entry ID provided
   if (body.id) {
     try {
       await db.update(urlsTable)
         .set({
-          normalizedUrl: result.url,
-          status: result.status,
-          statusCode: result.statusCode,
-          responseTime: result.responseTime,
-          checkedAt: result.checkedAt,
-          error: result.error ?? null,
+          normalizedUrl: checkResult.url,
+          status: checkResult.status,
+          statusCode: checkResult.statusCode,
+          responseTime: checkResult.responseTime,
+          checkedAt: checkResult.checkedAt,
+          error: checkResult.error ?? null,
         })
         .where(eq(urlsTable.id, body.id))
+
+      // Record in check history
+      insertHistory.run({
+        id: crypto.randomUUID(),
+        urlId: body.id,
+        status: checkResult.status,
+        statusCode: checkResult.statusCode,
+        responseTime: checkResult.responseTime,
+        checkedAt: checkResult.checkedAt,
+      })
     } catch {
-      // DB write failed — still return result to client
+      // DB write failed — still return result
     }
   }
 
-  return result
+  return checkResult
 })
