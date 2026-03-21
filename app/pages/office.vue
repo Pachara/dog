@@ -33,9 +33,25 @@
       <p class="empty-desc">No *-oracle directories found in Projects</p>
     </div>
 
-    <div v-else class="oracle-grid">
+    <!-- Filter + Sort bar -->
+    <div v-if="oracles.length > 0" class="filter-bar">
+      <div class="filter-tabs">
+        <button v-for="f in filters" :key="f.id" class="filter-btn" :class="{ active: activeFilter === f.id }" @click="activeFilter = f.id">
+          {{ f.label }} ({{ f.count }})
+        </button>
+      </div>
+      <select v-model="sortBy" class="sort-select">
+        <option value="status">Sort: Status</option>
+        <option value="cpu">Sort: CPU</option>
+        <option value="name">Sort: Name</option>
+      </select>
+    </div>
+
+    <div v-else-if="false"></div>
+
+    <div v-if="oracles.length > 0" class="oracle-grid">
       <div
-        v-for="oracle in oracles"
+        v-for="oracle in sortedOracles"
         :key="oracle.id"
         class="oracle-card"
         :class="{
@@ -63,6 +79,11 @@
             <div class="cpu-bar-fill" :class="cpuBarClass(oracle.cpu)" :style="{ width: Math.min(oracle.cpu, 100) + '%' }" />
           </div>
           <span class="cpu-bar-label">{{ oracle.cpu }}%</span>
+        </div>
+
+        <!-- Uptime counter -->
+        <div v-if="uptimeFor(oracle.id)" class="uptime-counter">
+          Online for {{ uptimeFor(oracle.id) }}
         </div>
 
         <div class="card-meta">
@@ -99,6 +120,59 @@ const { isDark, toggleTheme } = useTheme()
 const { oracles, loading, connected, fetchOracles, connect, disconnect } = useOracle()
 
 const onlineCount = computed(() => oracles.value.filter(o => o.status === 'online' || o.status === 'overdrive').length)
+
+// --- Filter + Sort ---
+const activeFilter = ref('all')
+const sortBy = ref('status')
+
+const statusOrder: Record<string, number> = { overdrive: 0, online: 1, idle: 2, offline: 3 }
+
+const filters = computed(() => [
+  { id: 'all', label: 'All', count: oracles.value.length },
+  { id: 'active', label: 'Online', count: oracles.value.filter(o => o.status === 'online' || o.status === 'overdrive').length },
+  { id: 'idle', label: 'Idle', count: oracles.value.filter(o => o.status === 'idle').length },
+  { id: 'offline', label: 'Offline', count: oracles.value.filter(o => o.status === 'offline').length },
+])
+
+const filteredOracles = computed(() => {
+  if (activeFilter.value === 'all') return oracles.value
+  if (activeFilter.value === 'active') return oracles.value.filter(o => o.status === 'online' || o.status === 'overdrive')
+  return oracles.value.filter(o => o.status === activeFilter.value)
+})
+
+const sortedOracles = computed(() => {
+  const list = [...filteredOracles.value]
+  switch (sortBy.value) {
+    case 'cpu': return list.sort((a, b) => b.cpu - a.cpu)
+    case 'name': return list.sort((a, b) => a.name.localeCompare(b.name))
+    default: return list.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9))
+  }
+})
+
+// --- Uptime counter ---
+const uptimeStart = ref<Record<string, number>>({})
+
+watch(oracles, (newOracles) => {
+  for (const o of newOracles) {
+    const isActive = o.status === 'online' || o.status === 'overdrive'
+    if (isActive && !uptimeStart.value[o.id]) {
+      uptimeStart.value[o.id] = Date.now()
+    } else if (!isActive) {
+      delete uptimeStart.value[o.id]
+    }
+  }
+}, { deep: true })
+
+function uptimeFor(id: string): string {
+  const start = uptimeStart.value[id]
+  if (!start) return ''
+  const secs = Math.floor((Date.now() - start) / 1000)
+  if (secs < 60) return `${secs}s`
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m`
+  const hours = Math.floor(mins / 60)
+  return `${hours}h ${mins % 60}m`
+}
 
 function statusLabel(oracle: { status: string, cpu: number }): string {
   switch (oracle.status) {
@@ -274,6 +348,67 @@ onUnmounted(() => {
   font-size: 0.85rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+/* Filter + Sort bar */
+.filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.filter-btn {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border-card-default);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.filter-btn:hover { border-color: var(--text-muted); }
+.filter-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-body);
+  border-color: var(--text-primary);
+}
+
+.sort-select {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border-card-default);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  outline: none;
+  cursor: pointer;
+}
+
+/* Uptime counter */
+.uptime-counter {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #16a34a;
+  padding: 0.2rem 0.5rem;
+  background: rgba(34, 197, 94, 0.08);
+  border-radius: 6px;
+  text-align: center;
+}
+
+[data-theme="dark"] .uptime-counter {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 /* Grid */
