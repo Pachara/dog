@@ -9,7 +9,7 @@
 
     <header class="compare-header">
       <h1>Price <span class="accent">Compare</span></h1>
-      <p class="subtitle">Makro vs Lotus's — find the best deal</p>
+      <p class="subtitle">Makro vs Lotus's — same product, who's cheaper?</p>
       <form class="search-form" @submit.prevent="doSearch">
         <input v-model="query" type="text" class="search-input" placeholder="Search products..." autofocus />
         <button type="submit" class="search-btn" :disabled="searching || !query.trim()">
@@ -18,58 +18,77 @@
       </form>
     </header>
 
-    <!-- Summary -->
-    <div v-if="searched && !searching" class="summary-bar">
-      <span class="summary-item summary-makro">Makro cheaper: <strong>{{ stats.makroCheaper }}</strong></span>
-      <span class="summary-item summary-lotus">Lotus's cheaper: <strong>{{ stats.lotusCheaper }}</strong></span>
-      <span class="summary-item summary-total">Total: {{ allProducts.length }} products</span>
+    <!-- Stats summary -->
+    <div v-if="searched && !searching && stats" class="summary-bar">
+      <span class="summary-chip summary-matched">{{ stats.matched }} matched</span>
+      <span class="summary-chip summary-makro">Makro wins: {{ stats.makroCheaper }}</span>
+      <span class="summary-chip summary-lotus">Lotus's wins: {{ stats.lotusCheaper }}</span>
+      <span v-if="stats.equal" class="summary-chip summary-equal">Tie: {{ stats.equal }}</span>
     </div>
 
     <!-- Filter tabs -->
-    <div v-if="searched && allProducts.length > 0" class="filter-tabs">
-      <button v-for="tab in tabs" :key="tab.id" class="tab-btn" :class="{ active: activeTab === tab.id }" @click="activeTab = tab.id">
-        {{ tab.label }} ({{ tab.count }})
-      </button>
+    <div v-if="searched && results.length > 0" class="filter-tabs">
+      <button class="tab-btn" :class="{ active: tab === 'all' }" @click="tab = 'all'">All ({{ results.length }})</button>
+      <button class="tab-btn" :class="{ active: tab === 'matched' }" @click="tab = 'matched'">Matched ({{ matchedResults.length }})</button>
+      <button class="tab-btn" :class="{ active: tab === 'makro' }" @click="tab = 'makro'">Makro Only ({{ makroOnly.length }})</button>
+      <button class="tab-btn" :class="{ active: tab === 'lotus' }" @click="tab = 'lotus'">Lotus's Only ({{ lotusOnly.length }})</button>
     </div>
 
     <div v-if="searching" class="status-msg">Searching both stores...</div>
-    <div v-else-if="searched && filteredProducts.length === 0" class="status-msg">No products found</div>
+    <div v-else-if="searched && filtered.length === 0" class="status-msg">No products found</div>
 
-    <!-- Product grid -->
-    <div class="product-grid">
-      <a
-        v-for="product in filteredProducts"
-        :key="product.id"
-        :href="product.link"
-        target="_blank"
-        rel="noopener"
-        class="product-card"
-        :class="{
-          'card--cheapest': product.isCheapest,
-          'card--expensive': product.isExpensive,
-        }"
-      >
-        <div class="card-store" :class="'store--' + product.store">
-          {{ product.store === 'makro' ? 'Makro' : "Lotus's" }}
-        </div>
-        <div class="card-img-wrap">
-          <img v-if="product.image" :src="product.image" :alt="product.name" class="card-img" loading="lazy" />
-          <div v-else class="card-img-placeholder">No Image</div>
-        </div>
-        <div class="card-body">
-          <p class="card-name">{{ product.name }}</p>
-          <div class="card-pricing">
-            <span class="card-price" :class="{ 'price--best': product.isCheapest, 'price--worst': product.isExpensive }">
-              {{ formatPrice(product.price) }}
-            </span>
-            <span v-if="product.originalPrice > product.price" class="card-original">{{ formatPrice(product.originalPrice) }}</span>
-            <span v-if="product.discount" class="card-discount">{{ product.discount }}</span>
+    <!-- Results -->
+    <div class="results-list">
+      <template v-for="item in filtered" :key="item.type === 'matched' ? item.makro.id : item.product.id">
+        <!-- Matched pair card -->
+        <div v-if="item.type === 'matched'" class="match-card">
+          <div class="match-name">{{ item.name }}</div>
+          <div class="match-sides">
+            <!-- Makro side -->
+            <a :href="item.makro.link" target="_blank" rel="noopener" class="match-side" :class="{ 'side--winner': item.cheaper === 'makro', 'side--loser': item.cheaper === 'lotus' }">
+              <span class="side-store store--makro">Makro</span>
+              <img v-if="item.makro.image" :src="item.makro.image" class="side-img" loading="lazy" />
+              <div class="side-pricing">
+                <span class="side-price">{{ formatPrice(item.makro.price) }}</span>
+                <span v-if="item.makro.originalPrice > item.makro.price" class="side-original">{{ formatPrice(item.makro.originalPrice) }}</span>
+              </div>
+              <span v-if="item.cheaper === 'makro'" class="winner-badge">Cheaper!</span>
+            </a>
+            <!-- VS divider -->
+            <div class="match-vs">
+              <span class="vs-text">VS</span>
+              <span v-if="item.priceDiff > 0" class="vs-diff">{{ formatPrice(item.priceDiff) }}</span>
+            </div>
+            <!-- Lotus side -->
+            <a :href="item.lotus.link" target="_blank" rel="noopener" class="match-side" :class="{ 'side--winner': item.cheaper === 'lotus', 'side--loser': item.cheaper === 'makro' }">
+              <span class="side-store store--lotus">Lotus's</span>
+              <img v-if="item.lotus.image" :src="item.lotus.image" class="side-img" loading="lazy" />
+              <div class="side-pricing">
+                <span class="side-price">{{ formatPrice(item.lotus.price) }}</span>
+                <span v-if="item.lotus.originalPrice > item.lotus.price" class="side-original">{{ formatPrice(item.lotus.originalPrice) }}</span>
+              </div>
+              <span v-if="item.cheaper === 'lotus'" class="winner-badge">Cheaper!</span>
+            </a>
           </div>
-          <span v-if="product.priceDiff" class="card-diff" :class="product.isCheapest ? 'diff--save' : 'diff--more'">
-            {{ product.isCheapest ? 'Save' : 'More' }} {{ formatPrice(Math.abs(product.priceDiff)) }}
-          </span>
         </div>
-      </a>
+
+        <!-- Unmatched single card -->
+        <a v-else :href="item.product.link" target="_blank" rel="noopener" class="single-card">
+          <span class="single-store" :class="'store--' + item.product.store">
+            {{ item.product.store === 'makro' ? 'Makro' : "Lotus's" }}
+          </span>
+          <img v-if="item.product.image" :src="item.product.image" class="single-img" loading="lazy" />
+          <div class="single-body">
+            <p class="single-name">{{ item.product.name }}</p>
+            <div class="single-pricing">
+              <span class="single-price">{{ formatPrice(item.product.price) }}</span>
+              <span v-if="item.product.originalPrice > item.product.price" class="single-original">{{ formatPrice(item.product.originalPrice) }}</span>
+              <span v-if="item.product.discount" class="single-discount">{{ item.product.discount }}</span>
+            </div>
+          </div>
+          <span class="single-only">Only here</span>
+        </a>
+      </template>
     </div>
   </div>
 </template>
@@ -77,239 +96,111 @@
 <script setup lang="ts">
 const { isDark, toggleTheme } = useTheme()
 
-interface Product {
-  id: string
-  name: string
-  price: number
-  originalPrice: number
-  discount: string
-  image: string
-  link: string
-  store: 'makro' | 'lotus'
-  isCheapest: boolean
-  isExpensive: boolean
-  priceDiff: number
+interface NormalizedProduct {
+  id: string; name: string; nameEn: string; brand: string
+  price: number; originalPrice: number; discount: string
+  image: string; link: string; store: 'makro' | 'lotus'
 }
+interface MatchedPair {
+  type: 'matched'; name: string
+  makro: NormalizedProduct; lotus: NormalizedProduct
+  cheaper: 'makro' | 'lotus' | 'equal'; priceDiff: number
+}
+interface UnmatchedProduct { type: 'unmatched'; product: NormalizedProduct }
+type CompareResult = MatchedPair | UnmatchedProduct
 
 const query = ref('')
-const allProducts = ref<Product[]>([])
+const results = ref<CompareResult[]>([])
+const stats = ref<any>(null)
 const searching = ref(false)
 const searched = ref(false)
-const activeTab = ref('all')
+const tab = ref('all')
 
 function formatPrice(n: number): string {
   if (!n) return '-'
   return n.toLocaleString('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 })
 }
 
-const stats = computed(() => {
-  let makroCheaper = 0
-  let lotusCheaper = 0
-  for (const p of allProducts.value) {
-    if (p.isCheapest && p.store === 'makro') makroCheaper++
-    if (p.isCheapest && p.store === 'lotus') lotusCheaper++
-  }
-  return { makroCheaper, lotusCheaper }
-})
+const matchedResults = computed(() => results.value.filter(r => r.type === 'matched') as MatchedPair[])
+const makroOnly = computed(() => results.value.filter(r => r.type === 'unmatched' && r.product.store === 'makro'))
+const lotusOnly = computed(() => results.value.filter(r => r.type === 'unmatched' && r.product.store === 'lotus'))
 
-const tabs = computed(() => [
-  { id: 'all', label: 'All', count: allProducts.value.length },
-  { id: 'makro', label: 'Makro', count: allProducts.value.filter(p => p.store === 'makro').length },
-  { id: 'lotus', label: "Lotus's", count: allProducts.value.filter(p => p.store === 'lotus').length },
-  { id: 'best', label: 'Best Price', count: bestPriceProducts.value.length },
-])
-
-const bestPriceProducts = computed(() => {
-  // Group by normalized name, pick cheapest
-  const map = new Map<string, Product>()
-  for (const p of allProducts.value) {
-    const key = p.name.toLowerCase().replace(/[^a-z0-9ก-๙]/g, '').slice(0, 30)
-    const existing = map.get(key)
-    if (!existing || p.price < existing.price) {
-      map.set(key, p)
-    }
-  }
-  return [...map.values()]
-})
-
-const filteredProducts = computed(() => {
-  switch (activeTab.value) {
-    case 'makro': return allProducts.value.filter(p => p.store === 'makro')
-    case 'lotus': return allProducts.value.filter(p => p.store === 'lotus')
-    case 'best': return bestPriceProducts.value
-    default: return allProducts.value
+const filtered = computed(() => {
+  switch (tab.value) {
+    case 'matched': return matchedResults.value
+    case 'makro': return makroOnly.value
+    case 'lotus': return lotusOnly.value
+    default: return results.value
   }
 })
-
-function parseMakroProducts(data: any): Product[] {
-  return (data.hits || []).map((hit: any) => {
-    const doc = hit.document || hit
-    const price = doc.displayPrice || 0
-    const original = doc.originalPrice || 0
-    const pct = original > price ? `-${Math.round(((original - price) / original) * 100)}%` : ''
-    const images = doc.images || []
-    const makroId = doc.makroId || ''
-    const id = doc.id || ''
-    return {
-      id: `makro-${id}`,
-      name: doc.title || doc.titleEn || '',
-      price,
-      originalPrice: original,
-      discount: pct,
-      image: images[0] || '',
-      link: makroId ? `https://www.makro.pro/th/p/${makroId}-${id}` : '#',
-      store: 'makro' as const,
-      isCheapest: false,
-      isExpensive: false,
-      priceDiff: 0,
-    }
-  }).filter((p: Product) => p.name && p.price > 0)
-}
-
-function parseLotusProducts(data: any): Product[] {
-  const products = data?.data?.products || []
-  return products.map((item: any) => {
-    const pr = item.priceRange?.minimumPrice || {}
-    const price = pr.finalPrice?.value || 0
-    const original = pr.regularPrice?.value || 0
-    const pctOff = pr.discount?.percentOff || 0
-    const discount = pctOff > 0 ? `-${Math.round(pctOff)}%` : ''
-    const thumb = item.thumbnail?.url || ''
-    const urlKey = item.urlKey || ''
-    return {
-      id: `lotus-${item.id || urlKey}`,
-      name: item.name || '',
-      price,
-      originalPrice: original,
-      discount,
-      image: thumb,
-      link: urlKey ? `https://www.lotuss.com/th/product/${urlKey}` : '#',
-      store: 'lotus' as const,
-      isCheapest: false,
-      isExpensive: false,
-      priceDiff: 0,
-    }
-  }).filter((p: Product) => p.name && p.price > 0)
-}
-
-function markCheapest(products: Product[]) {
-  // Simple approach: for each makro product, find closest lotus match and vice versa
-  const makro = products.filter(p => p.store === 'makro')
-  const lotus = products.filter(p => p.store === 'lotus')
-
-  if (makro.length > 0 && lotus.length > 0) {
-    const avgMakro = makro.reduce((s, p) => s + p.price, 0) / makro.length
-    const avgLotus = lotus.reduce((s, p) => s + p.price, 0) / lotus.length
-    const diff = avgMakro - avgLotus
-
-    // Mark individual products
-    for (const p of products) {
-      if (p.store === 'makro') {
-        p.priceDiff = diff
-        p.isCheapest = diff <= 0
-        p.isExpensive = diff > 0
-      } else {
-        p.priceDiff = -diff
-        p.isCheapest = diff >= 0
-        p.isExpensive = diff < 0
-      }
-    }
-  }
-}
 
 async function doSearch() {
   if (!query.value.trim()) return
   searching.value = true
   searched.value = false
-  activeTab.value = 'all'
-
+  tab.value = 'all'
   try {
-    const [makroData, lotusData] = await Promise.all([
-      $fetch<any>('/api/makro/search', { method: 'POST', body: { q: query.value, limit: 20 } }).catch(() => ({ hits: [] })),
-      $fetch<any>('/api/makro/lotuss', { method: 'POST', body: { q: query.value, limit: 20 } }).catch(() => ({ data: { products: [] } })),
-    ])
-
-    const makro = parseMakroProducts(makroData)
-    const lotus = parseLotusProducts(lotusData)
-    const combined = [...makro, ...lotus]
-
-    // Sort: interleave makro and lotus
-    combined.sort((a, b) => {
-      if (a.store !== b.store) return a.store === 'makro' ? -1 : 1
-      return a.price - b.price
+    const data = await $fetch<{ results: CompareResult[]; stats: any }>('/api/compare', {
+      method: 'POST', body: { q: query.value },
     })
-
-    markCheapest(combined)
-    allProducts.value = combined
+    results.value = data.results
+    stats.value = data.stats
   } catch {
-    allProducts.value = []
+    results.value = []
+    stats.value = null
   }
-
   searching.value = false
   searched.value = true
 }
 </script>
 
 <style scoped>
-.compare {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
-}
+.compare { max-width: 820px; margin: 0 auto; padding: 1.5rem 1rem; }
 
-.compare-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
+.compare-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
 .back-link { color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; }
 .back-link:hover { color: var(--text-primary); }
-
 .theme-toggle {
   background: var(--bg-btn-secondary); border: none; border-radius: 50%;
   width: 36px; height: 36px; font-size: 1.1rem; cursor: pointer;
   display: flex; align-items: center; justify-content: center; color: var(--text-primary);
 }
 
-.compare-header { text-align: center; margin-bottom: 1.5rem; }
+.compare-header { text-align: center; margin-bottom: 1.25rem; }
 .compare-header h1 { font-size: 1.5rem; font-weight: 800; margin: 0; }
 .accent { background: linear-gradient(135deg, #0055a5, #22c55e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-.subtitle { color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0 1rem; }
+.subtitle { color: var(--text-muted); font-size: 0.82rem; margin: 0.2rem 0 1rem; }
 
-.search-form { display: flex; gap: 0.5rem; max-width: 500px; margin: 0 auto; }
+.search-form { display: flex; gap: 0.5rem; max-width: 480px; margin: 0 auto; }
 .search-input {
-  flex: 1; padding: 0.7rem 1rem; border: 1.5px solid var(--border-input);
+  flex: 1; padding: 0.65rem 1rem; border: 1.5px solid var(--border-input);
   border-radius: 10px; font-size: 0.9rem; outline: none;
   background: var(--bg-input); color: var(--text-primary);
 }
 .search-input::placeholder { color: var(--text-muted); }
 .search-input:focus { border-color: #0055a5; }
 .search-btn {
-  padding: 0.7rem 1.25rem; border: none; border-radius: 10px;
+  padding: 0.65rem 1.25rem; border: none; border-radius: 10px;
   font-size: 0.85rem; font-weight: 600; cursor: pointer;
   background: linear-gradient(135deg, #0055a5, #22c55e); color: white; white-space: nowrap;
 }
 .search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Summary */
-.summary-bar {
-  display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;
-  margin-bottom: 1rem; font-size: 0.8rem;
-}
-.summary-item { padding: 0.35rem 0.75rem; border-radius: 8px; }
+.summary-bar { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.summary-chip { font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 8px; }
+.summary-matched { background: var(--bg-btn-secondary); color: var(--text-primary); }
 .summary-makro { background: rgba(0, 85, 165, 0.1); color: #0055a5; }
 .summary-lotus { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
-.summary-total { color: var(--text-muted); }
+.summary-equal { background: rgba(107, 114, 128, 0.1); color: var(--text-muted); }
 [data-theme="dark"] .summary-makro { background: rgba(96, 165, 250, 0.12); color: #60a5fa; }
 [data-theme="dark"] .summary-lotus { background: rgba(248, 113, 113, 0.12); color: #f87171; }
 
 /* Tabs */
 .filter-tabs { display: flex; gap: 0.35rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .tab-btn {
-  padding: 0.4rem 0.75rem; border: 1px solid var(--border-card-default);
-  border-radius: 8px; font-size: 0.75rem; font-weight: 500; cursor: pointer;
+  padding: 0.35rem 0.7rem; border: 1px solid var(--border-card-default);
+  border-radius: 8px; font-size: 0.72rem; font-weight: 500; cursor: pointer;
   background: transparent; color: var(--text-secondary); transition: all 0.2s;
 }
 .tab-btn:hover { border-color: var(--text-muted); }
@@ -317,70 +208,98 @@ async function doSearch() {
 
 .status-msg { text-align: center; padding: 3rem; color: var(--text-muted); }
 
-/* Grid */
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.75rem;
-}
-@media (max-width: 480px) { .product-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; } }
+/* Results list */
+.results-list { display: flex; flex-direction: column; gap: 0.75rem; }
 
-/* Card */
-.product-card {
-  background: var(--bg-card); border: 1.5px solid var(--border-card-default);
-  border-radius: 12px; overflow: hidden; text-decoration: none;
-  color: inherit; transition: all 0.25s; display: flex; flex-direction: column;
-  position: relative;
+/* --- MATCHED PAIR CARD --- */
+.match-card {
+  background: var(--bg-card); border: 1px solid var(--border-card-default);
+  border-radius: 14px; padding: 0.85rem 1rem; transition: all 0.2s;
 }
-.product-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08); }
-.card--cheapest { border-color: rgba(34, 197, 94, 0.4); }
-.card--cheapest:hover { border-color: rgba(34, 197, 94, 0.6); }
-.card--expensive { border-color: rgba(239, 68, 68, 0.2); }
+.match-card:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
 
-/* Store badge */
-.card-store {
-  position: absolute; top: 6px; left: 6px; z-index: 2;
-  font-size: 0.55rem; font-weight: 700; padding: 0.15rem 0.4rem;
+.match-name {
+  font-size: 0.82rem; font-weight: 600; margin-bottom: 0.6rem;
+  text-align: center; color: var(--text-primary);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.match-sides { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0.5rem; align-items: center; }
+
+.match-side {
+  display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+  text-decoration: none; color: inherit; padding: 0.5rem;
+  border-radius: 10px; transition: all 0.2s; position: relative;
+}
+.match-side:hover { background: var(--bg-btn-secondary); }
+
+.side--winner { border: 1.5px solid rgba(34, 197, 94, 0.4); border-radius: 10px; }
+.side--loser { opacity: 0.7; }
+
+.side-store {
+  font-size: 0.6rem; font-weight: 700; padding: 0.1rem 0.35rem;
   border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em;
 }
 .store--makro { background: #0055a5; color: white; }
 .store--lotus { background: #dc2626; color: white; }
 
-/* Image */
-.card-img-wrap {
-  aspect-ratio: 1; background: #f8f8f8; display: flex;
-  align-items: center; justify-content: center; overflow: hidden;
-}
-[data-theme="dark"] .card-img-wrap { background: #1a1a2e; }
-.card-img { width: 100%; height: 100%; object-fit: contain; padding: 0.5rem; }
-.card-img-placeholder { color: var(--text-muted); font-size: 0.7rem; }
+.side-img { width: 56px; height: 56px; object-fit: contain; border-radius: 6px; }
 
-/* Body */
-.card-body { padding: 0.6rem 0.75rem 0.75rem; display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
-.card-name {
-  font-size: 0.75rem; font-weight: 600; margin: 0;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; line-height: 1.3;
+.side-pricing { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
+.side-price { font-size: 1rem; font-weight: 700; }
+.side--winner .side-price { color: #16a34a; }
+[data-theme="dark"] .side--winner .side-price { color: #4ade80; }
+.side-original { font-size: 0.65rem; color: var(--text-muted); text-decoration: line-through; }
+
+.winner-badge {
+  font-size: 0.55rem; font-weight: 700; color: #16a34a;
+  background: rgba(34, 197, 94, 0.1); padding: 0.1rem 0.35rem; border-radius: 4px;
+}
+[data-theme="dark"] .winner-badge { color: #4ade80; background: rgba(34, 197, 94, 0.15); }
+
+/* VS divider */
+.match-vs { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+.vs-text { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); }
+.vs-diff { font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); }
+
+/* --- UNMATCHED SINGLE CARD --- */
+.single-card {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: var(--bg-card); border: 1px solid var(--border-card-default);
+  border-radius: 12px; padding: 0.65rem 0.85rem; text-decoration: none;
+  color: inherit; transition: all 0.2s; position: relative;
+}
+.single-card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); }
+
+.single-store {
+  position: absolute; top: 6px; right: 6px;
+  font-size: 0.5rem; font-weight: 700; padding: 0.1rem 0.3rem;
+  border-radius: 3px; text-transform: uppercase;
 }
 
-.card-pricing { display: flex; align-items: baseline; gap: 0.3rem; margin-top: 0.15rem; }
-.card-price { font-size: 0.95rem; font-weight: 700; }
-.price--best { color: #16a34a; }
-.price--worst { color: #dc2626; }
-[data-theme="dark"] .price--best { color: #4ade80; }
-[data-theme="dark"] .price--worst { color: #f87171; }
-.card-original { font-size: 0.65rem; color: var(--text-muted); text-decoration: line-through; }
-.card-discount {
-  font-size: 0.55rem; font-weight: 700; background: #dc2626; color: white;
-  padding: 0.1rem 0.25rem; border-radius: 3px;
+.single-img { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+
+.single-body { flex: 1; min-width: 0; }
+.single-name {
+  font-size: 0.78rem; font-weight: 500; margin: 0;
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+}
+.single-pricing { display: flex; align-items: baseline; gap: 0.3rem; margin-top: 0.15rem; }
+.single-price { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
+.single-original { font-size: 0.65rem; color: var(--text-muted); text-decoration: line-through; }
+.single-discount {
+  font-size: 0.5rem; font-weight: 700; background: #dc2626; color: white;
+  padding: 0.05rem 0.2rem; border-radius: 3px;
 }
 
-.card-diff {
-  font-size: 0.65rem; font-weight: 600; margin-top: 0.15rem;
-  padding: 0.15rem 0.35rem; border-radius: 4px; align-self: flex-start;
+.single-only {
+  font-size: 0.6rem; color: var(--text-muted); font-style: italic; flex-shrink: 0;
 }
-.diff--save { background: rgba(34, 197, 94, 0.1); color: #16a34a; }
-.diff--more { background: rgba(239, 68, 68, 0.08); color: #dc2626; }
-[data-theme="dark"] .diff--save { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-[data-theme="dark"] .diff--more { background: rgba(239, 68, 68, 0.12); color: #f87171; }
+
+/* Responsive */
+@media (max-width: 520px) {
+  .match-sides { grid-template-columns: 1fr auto 1fr; gap: 0.25rem; }
+  .side-img { width: 40px; height: 40px; }
+  .side-price { font-size: 0.85rem; }
+}
 </style>
