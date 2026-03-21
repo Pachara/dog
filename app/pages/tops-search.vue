@@ -7,146 +7,104 @@
 
     <header class="store-header">
       <h1 class="store-title store-title--tops">Tops <span>Search</span></h1>
-      <form class="search-form" @submit.prevent="doSearch">
-        <input v-model="query" type="text" class="search-input" placeholder="Search Tops products..." autofocus />
-        <button type="submit" class="search-btn search-btn--tops" :disabled="searching || !query.trim()">
-          {{ searching ? '...' : 'Search' }}
-        </button>
-      </form>
+
+      <div class="cli-notice">
+        <div class="notice-icon">&#128274;</div>
+        <h2 class="notice-title">Tops is available via CLI only</h2>
+        <p class="notice-desc">
+          Tops.co.th is protected by Cloudflare, blocking all server/browser requests from external sites.
+          Use the Oracle CLI skill instead:
+        </p>
+        <div class="cli-examples">
+          <code>/tops-search milk</code>
+          <code>/tops-search "เฮลบลูบอย" --compare</code>
+          <code>/tops-search ไข่ไก่ --limit 10</code>
+        </div>
+        <p class="notice-sub">
+          The <code>--compare</code> flag searches Tops + Makro + Lotus's in parallel and shows a 3-way price comparison.
+        </p>
+      </div>
+
+      <div class="alt-links">
+        <p class="alt-title">Meanwhile, try these:</p>
+        <div class="alt-buttons">
+          <NuxtLink to="/makro-search" class="alt-btn alt-btn--makro">Makro Search</NuxtLink>
+          <NuxtLink to="/lotus-search" class="alt-btn alt-btn--lotus">Lotus's Search</NuxtLink>
+          <NuxtLink to="/makro" class="alt-btn alt-btn--compare">Price Compare</NuxtLink>
+        </div>
+      </div>
     </header>
-
-    <div v-if="searching" class="status-msg">Searching Tops...</div>
-    <div v-else-if="searched && products.length === 0 && !error" class="status-msg">No products found</div>
-    <div v-if="error" class="status-msg error-msg">{{ error }}</div>
-    <p v-if="products.length > 0" class="result-count">{{ totalProducts }} products found (showing {{ products.length }})</p>
-
-    <div class="product-grid">
-      <a v-for="p in products" :key="p.sku" :href="p.link" target="_blank" rel="noopener" class="product-card">
-        <div class="card-img-wrap">
-          <img v-if="p.image" :src="p.image" :alt="p.name" class="card-img" loading="lazy" />
-          <span v-if="p.priceSaved > 0" class="discount-tag">Save {{ formatPrice(p.priceSaved) }}</span>
-          <span v-if="!p.inStock" class="out-of-stock">Out of Stock</span>
-        </div>
-        <div class="card-body">
-          <p class="card-name">{{ p.name }}</p>
-          <p v-if="p.brand" class="card-brand">{{ p.brand }}</p>
-          <div class="card-pricing">
-            <span class="card-price">{{ formatPrice(p.price) }}</span>
-            <span v-if="p.originalPrice > p.price" class="card-original">{{ formatPrice(p.originalPrice) }}</span>
-          </div>
-          <p v-if="p.unitName" class="card-unit">{{ p.unitName }}</p>
-          <p v-if="p.category" class="card-category">{{ p.category }}</p>
-        </div>
-      </a>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 const { isDark, toggleTheme } = useTheme()
-
-interface Product {
-  sku: string; name: string; brand: string
-  price: number; originalPrice: number; priceSaved: number
-  image: string; link: string; unitName: string
-  inStock: boolean; category: string
-}
-
-const query = ref('')
-const products = ref<Product[]>([])
-const totalProducts = ref(0)
-const searching = ref(false)
-const searched = ref(false)
-const error = ref('')
-
-function formatPrice(n: number): string {
-  if (!n) return '-'
-  return n.toLocaleString('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 })
-}
-
-async function doSearch() {
-  if (!query.value.trim()) return
-  searching.value = true
-  searched.value = false
-  error.value = ''
-
-  try {
-    const data = await $fetch<any>('/api/tops/search', {
-      params: { q: query.value },
-    })
-
-    // Response: pageProps.data.products[]
-    const pageProps = data?.pageProps || {}
-    const productData = pageProps?.data || pageProps?.initialData || pageProps || {}
-    const productList = productData?.products || []
-    totalProducts.value = productData?.totalProducts || productList.length
-
-    products.value = productList.map((item: any) => ({
-      sku: item.sku || '',
-      name: item.name || '',
-      brand: item.brand || '',
-      price: item.price || 0,
-      originalPrice: item.originalPrice || 0,
-      priceSaved: item.priceSaved || 0,
-      image: item.pimImage ? `https://www.tops.co.th${item.pimImage}` : '',
-      link: item.slugName ? `https://www.tops.co.th/en/${item.slugName}` : '#',
-      unitName: item.unitName || '',
-      inStock: item.stockAvail !== 0,
-      category: item.categoryLevel1 || '',
-    })).filter((p: Product) => p.name)
-  } catch (e: any) {
-    error.value = `Search failed: ${e.data?.statusMessage || e.message || 'Unknown error'}`
-    products.value = []
-  }
-
-  searching.value = false
-  searched.value = true
-}
 </script>
 
 <style scoped>
-.store-search { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem; }
+.store-search { max-width: 600px; margin: 0 auto; padding: 1.5rem 1rem; }
 .store-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
 .back-link { color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; }
 .back-link:hover { color: var(--text-primary); }
 .theme-toggle { background: var(--bg-btn-secondary); border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-primary); }
 
-.store-header { text-align: center; margin-bottom: 1.5rem; }
-.store-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 1rem; }
+.store-header { text-align: center; }
+.store-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 1.5rem; }
 .store-title--tops span { color: #e3192c; }
 [data-theme="dark"] .store-title--tops span { color: #f87171; }
 
-.search-form { display: flex; gap: 0.5rem; max-width: 500px; margin: 0 auto; }
-.search-input { flex: 1; padding: 0.7rem 1rem; border: 1.5px solid var(--border-input); border-radius: 10px; font-size: 0.9rem; outline: none; background: var(--bg-input); color: var(--text-primary); }
-.search-input::placeholder { color: var(--text-muted); }
-.search-input:focus { border-color: #e3192c; }
-.search-btn { padding: 0.7rem 1.25rem; border: none; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: white; white-space: nowrap; }
-.search-btn--tops { background: #e3192c; }
-.search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cli-notice {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card-default);
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
 
-.status-msg { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.9rem; }
-.error-msg { color: #dc2626; }
-.result-count { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 0.75rem; }
+.notice-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+.notice-title { font-size: 1.1rem; font-weight: 700; margin: 0 0 0.5rem; }
+.notice-desc { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 1rem; line-height: 1.5; }
+.notice-desc code { background: var(--bg-btn-secondary); padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.8rem; }
 
-.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
-@media (max-width: 480px) { .product-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; } }
+.cli-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
 
-.product-card { background: var(--bg-card); border: 1px solid var(--border-card-default); border-radius: 12px; overflow: hidden; text-decoration: none; color: inherit; transition: all 0.25s; display: flex; flex-direction: column; }
-.product-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08); }
+.cli-examples code {
+  display: block;
+  background: #0f172a;
+  color: #22d3ee;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  text-align: left;
+}
 
-.card-img-wrap { position: relative; aspect-ratio: 1; background: #f8f8f8; display: flex; align-items: center; justify-content: center; }
-[data-theme="dark"] .card-img-wrap { background: #1a1a2e; }
-.card-img { width: 100%; height: 100%; object-fit: contain; padding: 0.75rem; }
-.discount-tag { position: absolute; top: 6px; right: 6px; background: #e3192c; color: white; font-size: 0.6rem; font-weight: 700; padding: 0.15rem 0.35rem; border-radius: 4px; }
-.out-of-stock { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; }
+[data-theme="light"] .cli-examples code {
+  background: #1e293b;
+}
 
-.card-body { padding: 0.6rem 0.75rem 0.75rem; display: flex; flex-direction: column; gap: 0.15rem; flex: 1; }
-.card-name { font-size: 0.78rem; font-weight: 600; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
-.card-brand { font-size: 0.65rem; color: var(--text-secondary); margin: 0; }
-.card-pricing { display: flex; align-items: baseline; gap: 0.3rem; margin-top: 0.15rem; }
-.card-price { font-size: 0.95rem; font-weight: 700; color: #e3192c; }
-[data-theme="dark"] .card-price { color: #f87171; }
-.card-original { font-size: 0.65rem; color: var(--text-muted); text-decoration: line-through; }
-.card-unit { font-size: 0.6rem; color: var(--text-secondary); margin: 0; }
-.card-category { font-size: 0.6rem; color: var(--text-muted); margin: 0; margin-top: auto; background: var(--bg-btn-secondary); padding: 0.1rem 0.3rem; border-radius: 3px; align-self: flex-start; }
+.notice-sub { font-size: 0.78rem; color: var(--text-muted); margin: 0; line-height: 1.4; }
+.notice-sub code { background: var(--bg-btn-secondary); padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.75rem; }
+
+.alt-links { margin-top: 1rem; }
+.alt-title { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 0.75rem; }
+.alt-buttons { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+.alt-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: white;
+  transition: all 0.2s;
+}
+.alt-btn:hover { transform: translateY(-1px); }
+.alt-btn--makro { background: #0055a5; }
+.alt-btn--lotus { background: #dc2626; }
+.alt-btn--compare { background: linear-gradient(135deg, #0055a5, #22c55e); }
 </style>
