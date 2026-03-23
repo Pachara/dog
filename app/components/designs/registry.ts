@@ -19,6 +19,10 @@ import CardAddUrlForm from './card/AddUrlForm.vue'
 import CardMonitorList from './card/MonitorList.vue'
 import IconAddUrlForm from './icon/AddUrlForm.vue'
 import IconMonitorList from './icon/MonitorList.vue'
+import TerminalAddUrlForm from './terminal/AddUrlForm.vue'
+import TerminalMonitorList from './terminal/MonitorList.vue'
+import GlassmorphismAddUrlForm from './glassmorphism/AddUrlForm.vue'
+import GlassmorphismMonitorList from './glassmorphism/MonitorList.vue'
 
 export interface DesignComponents {
   AddUrlForm: Component
@@ -49,5 +53,13 @@ export const designRegistry: Record<string, DesignComponents> = {
   icon: {
     AddUrlForm: IconAddUrlForm,
     MonitorList: IconMonitorList,
+  },
+  terminal: {
+    AddUrlForm: TerminalAddUrlForm,
+    MonitorList: TerminalMonitorList,
+  },
+  glassmorphism: {
+    AddUrlForm: GlassmorphismAddUrlForm,
+    MonitorList: GlassmorphismMonitorList,
   },
 }

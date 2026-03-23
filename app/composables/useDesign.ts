@@ -18,6 +18,8 @@ const designs: DesignMeta[] = [
   { id: 'pixel', label: 'Pixel', description: '8-bit retro gaming with pixel fonts, health bars, and NES aesthetics' },
   { id: 'card', label: 'Card', description: 'Elevated cards with shadows, generous spacing, and smooth hover animations' },
   { id: 'icon', label: 'Icon', description: 'App-style favicon grid like iOS home screen' },
+  { id: 'terminal', label: 'Terminal', description: 'Hacker CLI aesthetic with green-on-black monospace and scanlines' },
+  { id: 'glassmorphism', label: 'Glass', description: 'Frosted glass cards with blur backdrop and translucent layers' },
 ]
 
 export function useDesign() {
