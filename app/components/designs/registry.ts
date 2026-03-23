@@ -23,6 +23,10 @@ import TerminalAddUrlForm from './terminal/AddUrlForm.vue'
 import TerminalMonitorList from './terminal/MonitorList.vue'
 import GlassmorphismAddUrlForm from './glassmorphism/AddUrlForm.vue'
 import GlassmorphismMonitorList from './glassmorphism/MonitorList.vue'
+import CyberpunkAddUrlForm from './cyberpunk/AddUrlForm.vue'
+import CyberpunkMonitorList from './cyberpunk/MonitorList.vue'
+import MinimalAddUrlForm from './minimal/AddUrlForm.vue'
+import MinimalMonitorList from './minimal/MonitorList.vue'
 
 export interface DesignComponents {
   AddUrlForm: Component
@@ -61,5 +65,13 @@ export const designRegistry: Record<string, DesignComponents> = {
   glassmorphism: {
     AddUrlForm: GlassmorphismAddUrlForm,
     MonitorList: GlassmorphismMonitorList,
+  },
+  cyberpunk: {
+    AddUrlForm: CyberpunkAddUrlForm,
+    MonitorList: CyberpunkMonitorList,
+  },
+  minimal: {
+    AddUrlForm: MinimalAddUrlForm,
+    MonitorList: MinimalMonitorList,
   },
 }

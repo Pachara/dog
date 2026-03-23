@@ -20,6 +20,8 @@ const designs: DesignMeta[] = [
   { id: 'icon', label: 'Icon', description: 'App-style favicon grid like iOS home screen' },
   { id: 'terminal', label: 'Terminal', description: 'Hacker CLI aesthetic with green-on-black monospace and scanlines' },
   { id: 'glassmorphism', label: 'Glass', description: 'Frosted glass cards with blur backdrop and translucent layers' },
+  { id: 'cyberpunk', label: 'Cyberpunk', description: 'Neon-lit futuristic HUD with angular cuts and glitch effects' },
+  { id: 'minimal', label: 'Minimal', description: 'Ultra-clean typography-focused design with generous whitespace' },
 ]
 
 export function useDesign() {
